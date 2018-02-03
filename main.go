@@ -69,7 +69,7 @@ func HttpDestination(br *bufio.Reader) (hostname string, err error) {
 	    if err != nil  {
 			glog.Warning(err)
 		}
-		if len(tmp)<=index {
+		if len(tmp)<index {
 			return "",errors.New(errNoContent)
 		}
 		char = tmp[index-1]
