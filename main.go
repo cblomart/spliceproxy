@@ -105,6 +105,7 @@ func listen(port string, detectdest func(*bufio.Reader) (string, []byte, error))
 	defer l.Close()
 	for {
 		c, err := l.Accept()
+		defer c.Close()
 		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 		if err != nil {
 			glog.Warning(err)
@@ -115,7 +116,6 @@ func listen(port string, detectdest func(*bufio.Reader) (string, []byte, error))
 		dest, buff, err := detectdest(bufio.NewReader(c))
 		if err != nil {
 			glog.Warning(err)
-			c.Close()
 			continue
 		}
 		glog.Infof("Connection: %s->%s->%s", c.RemoteAddr().String(), port, dest)
