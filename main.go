@@ -147,6 +147,7 @@ func isLoopback(addr string) bool {
 
 //forward connection
 func forward(c net.Conn, buff []byte, dst string) {
+	glog.Info("Header:\n", string(buff))
 	// get hostname and port
 	if isLoopback(dst) {
 		glog.Warningf("not forwarding to loopback")
