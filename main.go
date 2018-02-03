@@ -62,8 +62,8 @@ func HTTPSDestination(br *bufio.Reader) (hostname string, buff []byte, err error
 func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error) {
 	glog.Info("Peeking for destination in http")
 	// peek into the stream
-	lastindex := 0
 	index := 1
+	lastindex := index
 	var char byte
 	for index <= cfg.Buffer {
 		buff, err := br.Peek(index)
@@ -74,10 +74,10 @@ func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error)
 			return "", buff, errors.New(errNoContent)
 		}
 		char = buff[index-1]
-		index++
-		if char == '\r' || char == '\n' {
-			line := string(buff[lastindex : index-2])
-			if strings.Compare("", line) == 0 && char == '\r' {
+		if char == '\r' {
+			//begin of new line
+			line := string(buff[lastindex : index-1])
+			if strings.Compare("", line) == 0 {
 				return "", buff, fmt.Errorf(errNoHttpHost, cfg.Buffer)
 			}
 			if strings.HasPrefix(line, hostHeader) {
@@ -85,9 +85,12 @@ func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error)
 				glog.Infof("Peeked a host: %s", hostname)
 				return hostname, buff, nil
 			}
-			continue
+			lastindex = index
 		}
-		lastindex = index
+		if char == '\n' {
+			lastindex = index
+		}
+		index++
 	}
 	return "", buff, fmt.Errorf(errNoHttpHost, cfg.Buffer)
 }
