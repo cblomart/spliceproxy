@@ -1,106 +1,106 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/tls"
+	"errors"
 	"flag"
-	"github.com/go-yaml/yaml"
-	"github.com/golang/glog"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
-	"bufio"
-	"errors"
-	"io"
-	"time"
-	"bytes"
 	"strings"
-	"fmt"
-	"crypto/tls"
+	"time"
+
+	"github.com/go-yaml/yaml"
+	"github.com/golang/glog"
 )
 
 const (
-	errNotImp = "Not Implemented."
+	errNotImp     = "Not Implemented."
 	errNoHttpHost = "No Host header found in buffered HTTP header (%d bytes)"
-	errNotTLS = "Communication is not TLS"
-	errNoContent = "Nothing recieved"
+	errNotTLS     = "Communication is not TLS"
+	errNoContent  = "Nothing recieved"
 
 	hostHeader = "Host: "
 
-	sslHeaderLen = 5
+	sslHeaderLen     = 5
 	sslTypeHandshake = 0x16
 )
 
 var cfg conf
 
 // from https://github.com/google/tcpproxy/blob/de1c7de/sni.go#L156
-func HttpsDestination(br *bufio.Reader) (hostname string,err error) {
+func HTTPSDestination(br *bufio.Reader) (hostname string, buff []byte, err error) {
 	// peek into the stream
-	buff, err := br.Peek(sslHeaderLen)
-    if err != nil  {
+	buff, err = br.Peek(sslHeaderLen)
+	if err != nil {
 		glog.Warning(err)
 	}
-	if len(buff)==0 {
-		return "",errors.New(errNoContent)
+	if len(buff) == 0 {
+		return "", buff, errors.New(errNoContent)
 	}
 	if buff[0] != sslTypeHandshake {
-		return "",errors.New(errNotTLS)
+		return "", buff, errors.New(errNotTLS)
 	}
 	recLen := int(buff[3])<<8 | int(buff[4]) // ignoring version in hdr[1:3]
-	helloBytes, err := br.Peek(sslHeaderLen + recLen)
+	buff, err = br.Peek(sslHeaderLen + recLen)
 	if err != nil {
-		return "",err
+		return "", buff, err
 	}
-	tls.Server(sniSniffConn{r: bytes.NewReader(helloBytes)}, &tls.Config{
+	tls.Server(sniSniffConn{r: bytes.NewReader(buff)}, &tls.Config{
 		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 			hostname = hello.ServerName
 			return nil, nil
 		},
-    }).Handshake()
-	return hostname,nil
+	}).Handshake()
+	return hostname, buff, nil
 }
 
-func HttpDestination(br *bufio.Reader) (hostname string, err error) {
+// HTTPDestination
+func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error) {
 	glog.Info("Peeking for destination in http")
-	// create the buffer
-	buff := bytes.NewBuffer(nil)
 	// peek into the stream
+	lastindex := 0
 	index := 1
 	var char byte
-	for (index <= cfg.Buffer) {
-		tmp, err := br.Peek(index)
-	    if err != nil  {
+	for index <= cfg.Buffer {
+		buff, err := br.Peek(index)
+		if err != nil {
 			glog.Warning(err)
 		}
-		if len(tmp)<index {
-			return "",errors.New(errNoContent)
+		if len(buff) < index {
+			return "", buff, errors.New(errNoContent)
 		}
-		char = tmp[index-1]
-		index += 1
+		char = buff[index-1]
+		index++
 		if char == '\r' || char == '\n' {
-			line := buff.String()
-			if (strings.Compare("",line) == 0 && char == '\r') {
-				return "",errors.New(fmt.Sprintf(errNoHttpHost,cfg.Buffer))
+			line := string(buff[lastindex : index-2])
+			if strings.Compare("", line) == 0 && char == '\r' {
+				return "", buff, fmt.Errorf(errNoHttpHost, cfg.Buffer)
 			}
-			if (strings.HasPrefix(line,hostHeader)) {
+			if strings.HasPrefix(line, hostHeader) {
 				hostname = strings.TrimPrefix(line, hostHeader)
-				glog.Infof("Peeked a host: %s",hostname)
-				return hostname, nil
+				glog.Infof("Peeked a host: %s", hostname)
+				return hostname, buff, nil
 			}
-			buff.Reset()
 			continue
 		}
-		buff.WriteByte(char)
+		lastindex = index
 	}
-	return "",errors.New(fmt.Sprintf(errNoHttpHost,cfg.Buffer))
+	return "", buff, fmt.Errorf(errNoHttpHost, cfg.Buffer)
 }
 
 //listen on defined port an forward to detected host by detectdest function
-func listen(port string, detectdest func(*bufio.Reader) (string, error)) {
+func listen(port string, detectdest func(*bufio.Reader) (string, []byte, error)) {
 	glog.Infof("Listening on port %s", port)
 	l, err := net.Listen("tcp", port)
 	if err != nil {
 		glog.Fatal(err)
 	}
 	defer l.Close()
-	for{
+	for {
 		c, err := l.Accept()
 		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 		if err != nil {
@@ -109,14 +109,14 @@ func listen(port string, detectdest func(*bufio.Reader) (string, error)) {
 		}
 		defer c.Close()
 		glog.Infof("Connection: %s->%s", c.RemoteAddr().String(), port)
-		dest, err := detectdest(bufio.NewReader(c))
+		dest, buff, err := detectdest(bufio.NewReader(c))
 		if err != nil {
 			glog.Warning(err)
 			c.Close()
 			continue
 		}
 		glog.Infof("Connection: %s->%s->%s", c.RemoteAddr().String(), port, dest)
-		go forward(c,dest + port)
+		go forward(c, buff, dest+port)
 	}
 }
 
@@ -143,9 +143,9 @@ func isLoopback(addr string) bool {
 }
 
 //forward connection
-func forward(c net.Conn, dst string) {
+func forward(c net.Conn, buff []byte, dst string) {
 	// get hostname and port
-	if (isLoopback(dst)) {
+	if isLoopback(dst) {
 		glog.Warningf("not forwarding to loopback")
 		c.Close()
 		return
@@ -158,6 +158,12 @@ func forward(c net.Conn, dst string) {
 		return
 	}
 	defer f.Close()
+
+	// write read buffer
+	if _, err = c.Write(buff); err != nil {
+		glog.Error(err)
+		return
+	}
 
 	ch := make(chan struct{}, 2)
 
@@ -181,7 +187,7 @@ func main() {
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 	// read config file
-	glog.Info("Reading config file: ",cfgfile) 
+	glog.Info("Reading config file: ", cfgfile)
 	data, err := ioutil.ReadFile(cfgfile)
 	if err != nil {
 		glog.Fatal(err)
@@ -191,12 +197,12 @@ func main() {
 	}
 
 	for _, d := range cfg.Listen.Http {
-		go listen(":"+d,HttpDestination)
+		go listen(":"+d, HTTPDestination)
 	}
 	for _, d := range cfg.Listen.Https {
-		go listen(":"+d,HttpsDestination)
+		go listen(":"+d, HTTPSDestination)
 	}
 
-	// wait 
-	select{}
+	// wait
+	select {}
 }
