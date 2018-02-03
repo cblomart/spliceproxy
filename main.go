@@ -120,7 +120,6 @@ func listen(port string, detectdest func(*bufio.Reader) (string, error)) {
 	}
 }
 
-
 // IsLoopback returns true if the name only resolves to loopback addresses.
 func isLoopback(addr string) bool {
 	host, _, err := net.SplitHostPort(addr)
