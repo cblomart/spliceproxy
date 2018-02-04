@@ -212,6 +212,8 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 	wg.Wait()
 	// close the connection
 	f.Close()
+	// notify end of transfer
+	glog.Infof("Forwarding to %s done", dst)
 }
 
 func main() {
