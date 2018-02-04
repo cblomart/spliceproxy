@@ -8,7 +8,7 @@ jobs:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
-      - run: $GOPATH
+      - run: ls -d1 $GOPATH/bin/*
   deloy:
     docker:
       - image: circleci/golang:1.8
