@@ -10,7 +10,7 @@ jobs:
       - run: go test -v ./...
       - run: go build
       - run: cp {{REPO_NAME}} {{CIRCLE_ARTIFACTS}}
-  deloy:
+  deploy:
     docker:
       - image: circleci/golang:1.8
     working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
