@@ -157,7 +157,6 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 			c.Close()
 			continue
 		}
-		glog.Infof("[%s] Found destination: %s", id, dest)
 		go forward(id.String(), bufferIo, dest)
 	}
 }
@@ -202,6 +201,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 		}
 		f = n
 	} else {
+		glog.Info("[%s] Proxying via: %s", cfg.Proxy)
 		proxyURL, err := url.Parse(cfg.Proxy)
 		if err != nil {
 			glog.Errorf("[%s] %s", id, err)
@@ -230,7 +230,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 	wg.Add(1)
 	go func() {
 		b, err := io.Copy(f, bufferIo)
-		glog.Infof("[%s] Copied %d bytes to %s", id, b, f.RemoteAddr().String())
+		glog.Infof("[%s] Copied %d bytes to %s for %s", id, b, f.RemoteAddr().String(), dst)
 		if err != nil {
 			if neterr, ok := err.(*net.OpError); ok {
 				if strings.Compare(neterr.Op, "write") == 0 {
@@ -246,7 +246,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 	wg.Add(1)
 	go func() {
 		b, err := io.Copy(bufferIo, f)
-		glog.Infof("[%s] Copied %d bytes from %s", id, b, f.RemoteAddr().String())
+		glog.Infof("[%s] Copied %d bytes from %s for %s", id, b, f.RemoteAddr().String(), dst)
 		if err != nil {
 			if neterr, ok := err.(*net.OpError); ok {
 				if strings.Compare(neterr.Op, "write") == 0 {
