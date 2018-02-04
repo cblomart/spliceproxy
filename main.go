@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-yaml/yaml"
 	"github.com/golang/glog"
+	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -32,12 +33,13 @@ const (
 
 var cfg conf
 
+// HTTPSDestination detect HTTPS destination via SNI
 // from https://github.com/google/tcpproxy/blob/de1c7de/sni.go#L156
-func HTTPSDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
+func HTTPSDestination(id string, br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
 	// peek into the stream
 	buff, err = br.Peek(sslHeaderLen)
 	if err != nil {
-		glog.Warning(err)
+		glog.Warningf("[%s] %s", id, err)
 	}
 	if len(buff) == 0 {
 		return "", buff, errors.New(errNoContent)
@@ -59,8 +61,8 @@ func HTTPSDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err e
 	return hostname, buff, nil
 }
 
-// HTTPDestination
-func HTTPDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
+// HTTPDestination detect HTTP destination in headers
+func HTTPDestination(id string, br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
 	glog.Info("Peeking for destination in http")
 	// peek into the stream
 	index := 1
@@ -69,7 +71,7 @@ func HTTPDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err er
 	for index <= cfg.Buffer {
 		buff, err := br.Peek(index)
 		if err != nil {
-			glog.Warning(err)
+			glog.Warningf("[%s] %s", id, err)
 		}
 		if len(buff) < index {
 			return "", buff, errors.New(errNoContent)
@@ -83,7 +85,7 @@ func HTTPDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err er
 			}
 			if strings.HasPrefix(line, hostHeader) {
 				hostname = strings.TrimPrefix(line, hostHeader)
-				glog.Infof("Peeked a host: %s", hostname)
+				glog.Infof("[%s] Peeked a host: %s", id, hostname)
 				return hostname, buff, nil
 			}
 			lastindex = index
@@ -97,7 +99,7 @@ func HTTPDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err er
 }
 
 //listen on defined port an forward to detected host by detectdest function
-func listen(port string, detectdest func(*bufio.ReadWriter) (string, []byte, error)) {
+func listen(port string, detectdest func(string, *bufio.ReadWriter) (string, []byte, error)) {
 	glog.Infof("Listening on port %s", port)
 	l, err := net.Listen("tcp", port)
 	if err != nil {
@@ -105,26 +107,27 @@ func listen(port string, detectdest func(*bufio.ReadWriter) (string, []byte, err
 	}
 	defer l.Close()
 	for {
+		id, _ := uuid.NewV4()
 		c, err := l.Accept()
 		if err != nil {
-			glog.Warning(err)
+			glog.Warningf("[%s] %s", id, err)
 			c.Close()
 			continue
 		}
 		defer c.Close()
 		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
-		glog.Infof("Connection: %s->%s", c.RemoteAddr().String(), port)
+		glog.Infof("[%s] Connection: %s->%s", id, c.RemoteAddr().String(), port)
 		bufferReader := bufio.NewReader(c)
 		bufferWriter := bufio.NewWriter(c)
 		bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
-		dest, _, err := detectdest(bufferIo)
+		dest, _, err := detectdest(id.String(), bufferIo)
 		if err != nil {
-			glog.Warning(err)
+			glog.Warningf("[%s] %s", id, err)
 			c.Close()
 			continue
 		}
-		glog.Infof("Connection: %s->%s->%s", c.RemoteAddr().String(), port, dest)
-		go forward(bufferIo, dest+port)
+		glog.Infof("[%s] Connection: %s->%s->%s", id, c.RemoteAddr().String(), port, dest)
+		go forward(id.String(), bufferIo, dest+port)
 	}
 }
 
@@ -151,17 +154,17 @@ func isLoopback(addr string) bool {
 }
 
 //forward connection
-func forward(bufferIo *bufio.ReadWriter, dst string) {
+func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 	// get hostname and port
 	if isLoopback(dst) {
-		glog.Warningf("not forwarding to loopback")
+		glog.Warningf("[%s] not forwarding to loopback", id)
 		return
 	}
 	// forward
-	glog.Infof("Forwarding to %s", dst)
+	glog.Infof("[%s] Forwarding to %s", id, dst)
 	f, err := net.Dial("tcp", dst)
 	if err != nil {
-		glog.Error(err)
+		glog.Errorf("[%s] %s", id, err)
 		return
 	}
 
@@ -172,7 +175,7 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 	// close when finished
 	defer f.Close()
 
-	glog.Info("Copying the rest of IOs")
+	glog.Info("[%s] Copying the rest of IOs", id)
 
 	// coordonate read writes
 	var wg sync.WaitGroup
@@ -180,14 +183,14 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 	wg.Add(1)
 	go func() {
 		b, err := io.Copy(f, bufferIo)
-		glog.Infof("Copied %d bytes to %s", b, f.RemoteAddr().String())
+		glog.Infof("[%s] Copied %d bytes to %s", id, b, f.RemoteAddr().String())
 		if err != nil {
 			if neterr, ok := err.(*net.OpError); ok {
 				if strings.Compare(neterr.Op, "write") == 0 {
-					glog.Warning(err)
+					glog.Warningf("[%s] %s", id, err)
 				}
 			} else {
-				glog.Warning(err)
+				glog.Warningf("[%s] %s", id, err)
 			}
 		}
 		wg.Done()
@@ -196,14 +199,14 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 	wg.Add(1)
 	go func() {
 		b, err := io.Copy(bufferIo, f)
-		glog.Infof("Copied %d bytes from %s", b, f.RemoteAddr().String())
+		glog.Infof("[%s] Copied %d bytes from %s", id, b, f.RemoteAddr().String())
 		if err != nil {
 			if neterr, ok := err.(*net.OpError); ok {
 				if strings.Compare(neterr.Op, "write") == 0 {
-					glog.Warning(err)
+					glog.Warningf("[%s] %s", id, err)
 				}
 			} else {
-				glog.Warning(err)
+				glog.Warningf("[%s] %s", id, err)
 			}
 		}
 		wg.Done()
@@ -213,7 +216,7 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 	// close the connection
 	f.Close()
 	// notify end of transfer
-	glog.Infof("Forwarding to %s done", dst)
+	glog.Infof("[%s] Forwarding to %s done", id, dst)
 }
 
 func main() {
