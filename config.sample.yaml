@@ -8,9 +8,9 @@ catchall:
 
 listen:
     https: 
-        - 443
+        - 0.0.0.0:443
     http: 
-        - 80
+        - 0.0.0.0:80
 
 alloweddomains:
     - example.com

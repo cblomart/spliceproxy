@@ -278,10 +278,10 @@ func main() {
 	glog.Infof("HTTPS catchall: %s", cfg.CatchAll.HTTPS)
 
 	for _, d := range cfg.Listen.HTTP {
-		go listen(":"+d, HTTPDestination)
+		go listen(d, HTTPDestination)
 	}
 	for _, d := range cfg.Listen.HTTPS {
-		go listen(":"+d, HTTPSDestination)
+		go listen(d, HTTPSDestination)
 	}
 
 	// wait
