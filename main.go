@@ -166,7 +166,7 @@ func forward(c net.Conn, buff []byte, dst string) {
 	defer c.Close()
 
 	// write read buffer
-	glog.Infof("Sending peeking buffer: %d", len(buff))
+	glog.Infof("Sending peeking buffer: %d bytes", len(buff))
 	if _, err = f.Write(buff); err != nil {
 		glog.Error(err)
 		// close all
