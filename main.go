@@ -19,7 +19,7 @@ import (
 
 const (
 	errNotImp     = "Not Implemented."
-	errNoHttpHost = "No Host header found in buffered HTTP header (%d bytes)"
+	errNoHTTPHost = "No Host header found in buffered HTTP header (%d bytes)"
 	errNotTLS     = "Communication is not TLS"
 	errNoContent  = "Nothing recieved"
 
@@ -78,7 +78,7 @@ func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error)
 			//begin of new line
 			line := string(buff[lastindex : index-1])
 			if strings.Compare("", line) == 0 {
-				return "", buff, fmt.Errorf(errNoHttpHost, cfg.Buffer)
+				return "", buff, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
 			}
 			if strings.HasPrefix(line, hostHeader) {
 				hostname = strings.TrimPrefix(line, hostHeader)
@@ -92,7 +92,7 @@ func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error)
 		}
 		index++
 	}
-	return "", buff, fmt.Errorf(errNoHttpHost, cfg.Buffer)
+	return "", buff, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
 }
 
 //listen on defined port an forward to detected host by detectdest function
@@ -164,7 +164,7 @@ func forward(c net.Conn, buff []byte, dst string) {
 
 	// write read buffer
 	glog.Infof("Sending peeking buffer: %d", len(buff))
-	if _, err = c.Write(buff); err != nil {
+	if _, err = f.Write(buff); err != nil {
 		glog.Error(err)
 		return
 	}
