@@ -9,7 +9,7 @@ jobs:
       - run: go get -v -t -d ./...
       - run: go test -v ./...
       - run: go build 
-      - run: cp $REPO_NAME CIRCLE_ARTIFACTS
+      - run: cp $REPO_NAME $CIRCLE_ARTIFACTS
   deploy:
     docker:
       - image: circleci/golang:1.8
