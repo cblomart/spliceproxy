@@ -10,12 +10,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-yaml/yaml"
 	"github.com/golang/glog"
+	"github.com/mwitkow/go-http-dialer"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -31,11 +33,13 @@ const (
 	sslTypeHandshake = 0x16
 )
 
-var cfg conf
+var (
+	cfg conf
+)
 
 // HTTPSDestination detect HTTPS destination via SNI
 // from https://github.com/google/tcpproxy/blob/de1c7de/sni.go#L156
-func HTTPSDestination(id string, br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
+func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname string, buff []byte, err error) {
 	// peek into the stream
 	buff, err = br.Peek(sslHeaderLen)
 	if err != nil {
@@ -58,12 +62,16 @@ func HTTPSDestination(id string, br *bufio.ReadWriter) (hostname string, buff []
 			return nil, nil
 		},
 	}).Handshake()
-	glog.Infof("[%s] Peeked destination: %s", id, hostname)
-	return hostname, buff, nil
+	glog.Infof("[%s] Peeked SSL destination: %s", id, hostname)
+	if cfg.allowed(hostname) {
+		return hostname + port, buff, nil
+	}
+	glog.Warningf("[%s] Destination %s not autorized redirecting to catchall: %s", id, hostname, cfg.CatchAll.HTTPS)
+	return cfg.CatchAll.HTTPS, buff, nil
 }
 
 // HTTPDestination detect HTTP destination in headers
-func HTTPDestination(id string, br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
+func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname string, buff []byte, err error) {
 	// peek into the stream
 	index := 1
 	lastindex := index
@@ -93,8 +101,8 @@ func HTTPDestination(id string, br *bufio.ReadWriter) (hostname string, buff []b
 			}
 			if strings.HasPrefix(line, hostHeader) {
 				hostname = strings.TrimPrefix(line, hostHeader)
-				glog.Infof("[%s] Peeked destination: %s", id, hostname)
-				return hostname, buff, nil
+				glog.Infof("[%s] Peeked HTTP destination: %s", id, hostname)
+				break
 			}
 			lastindex = index
 		}
@@ -103,11 +111,18 @@ func HTTPDestination(id string, br *bufio.ReadWriter) (hostname string, buff []b
 		}
 		index++
 	}
-	return "", buff, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
+	if len(hostname) == 0 {
+		return "", buff, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
+	}
+	if cfg.allowed(hostname) {
+		return hostname + port, buff, nil
+	}
+	glog.Warningf("[%s] Destination %s not autorized redirecting to catchall: %s", id, hostname, cfg.CatchAll.HTTP)
+	return cfg.CatchAll.HTTP, buff, nil
 }
 
 //listen on defined port an forward to detected host by detectdest function
-func listen(port string, detectdest func(string, *bufio.ReadWriter) (string, []byte, error)) {
+func listen(port string, detectdest func(string, *bufio.ReadWriter, string) (string, []byte, error)) {
 	glog.Infof("Listening on port %s", port)
 	l, err := net.Listen("tcp", port)
 	if err != nil {
@@ -128,14 +143,13 @@ func listen(port string, detectdest func(string, *bufio.ReadWriter) (string, []b
 		bufferReader := bufio.NewReader(c)
 		bufferWriter := bufio.NewWriter(c)
 		bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
-		dest, _, err := detectdest(id.String(), bufferIo)
+		dest, _, err := detectdest(id.String(), bufferIo, port)
 		if err != nil {
 			glog.Warningf("[%s] %s", id, err)
 			c.Close()
 			continue
 		}
-		glog.Infof("[%s] Routing: %s->%s->%s", id, c.RemoteAddr().String(), port, dest)
-		go forward(id.String(), bufferIo, dest+port)
+		go forward(id.String(), bufferIo, dest)
 	}
 }
 
@@ -170,10 +184,28 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 	}
 	// forward
 	glog.Infof("[%s] Forwarding to %s", id, dst)
-	f, err := net.Dial("tcp", dst)
-	if err != nil {
-		glog.Errorf("[%s] %s", id, err)
-		return
+	var f net.Conn
+	if len(cfg.Proxy) == 0 {
+		n, err := net.Dial("tcp", dst)
+		if err != nil {
+			glog.Errorf("[%s] %s", id, err)
+			return
+		}
+		f = n
+	} else {
+		proxyURL, err := url.Parse(cfg.Proxy)
+		if err != nil {
+			glog.Errorf("[%s] %s", id, err)
+			return
+		}
+		withProxyTimeout := http_dialer.WithConnectionTimeout(time.Duration(cfg.Timeout))
+		d := http_dialer.New(proxyURL, withProxyTimeout)
+		n, err := d.Dial("tcp", dst)
+		if err != nil {
+			glog.Errorf("[%s] %s", id, err)
+			return
+		}
+		f = n
 	}
 
 	// set deadlines
@@ -243,10 +275,10 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	for _, d := range cfg.Listen.Http {
+	for _, d := range cfg.Listen.HTTP {
 		go listen(":"+d, HTTPDestination)
 	}
-	for _, d := range cfg.Listen.Https {
+	for _, d := range cfg.Listen.HTTPS {
 		go listen(":"+d, HTTPSDestination)
 	}
 

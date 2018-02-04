@@ -1,20 +1,29 @@
 package main
 
 type catchAllDef struct {
-	Http	string
-	Https   string
+	HTTP  string
+	HTTPS string
 }
 
-
 type endpointsDef struct {
-	Http	[]string
-	Https   []string
+	HTTP  []string
+	HTTPS []string
 }
 
 type conf struct {
 	Timeout        int
-	Buffer		   int
-	Listen		   endpointsDef
+	Buffer         int
+	Listen         endpointsDef
+	Proxy          string
 	CatchAll       catchAllDef
 	AllowedDomains []string
+}
+
+func (c *conf) allowed(a string) bool {
+	for _, b := range c.AllowedDomains {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
