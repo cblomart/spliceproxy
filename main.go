@@ -126,7 +126,7 @@ func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname str
 		return hostname + port, false, nil
 	}
 	glog.Warningf("[%s] Destination %s not autorized redirecting to catchall: %s", id, hostname, cfg.CatchAll.HTTP)
-	return cfg.CatchAll.HTTP, false, nil
+	return cfg.CatchAll.HTTP, true, nil
 }
 
 //listen on defined port an forward to detected host by detectdest function
