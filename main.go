@@ -201,7 +201,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 		}
 		f = n
 	} else {
-		glog.Info("[%s] Proxying via: %s", cfg.Proxy)
+		glog.Infof("[%s] Proxying via: %s", id, cfg.Proxy)
 		proxyURL, err := url.Parse(cfg.Proxy)
 		if err != nil {
 			glog.Errorf("[%s] %s", id, err)
