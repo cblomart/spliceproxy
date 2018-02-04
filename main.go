@@ -47,22 +47,22 @@ func DenyServer(w http.ResponseWriter, req *http.Request) {
 
 // HTTPSDestination detect HTTPS destination via SNI
 // from https://github.com/google/tcpproxy/blob/de1c7de/sni.go#L156
-func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname string, buff []byte, err error) {
+func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname string, direct bool, err error) {
 	// peek into the stream
-	buff, err = br.Peek(sslHeaderLen)
+	buff, err := br.Peek(sslHeaderLen)
 	if err != nil {
 		glog.Warningf("[%s] %s", id, err)
 	}
 	if len(buff) == 0 {
-		return "", buff, errors.New(errNoContent)
+		return "", false, errors.New(errNoContent)
 	}
 	if buff[0] != sslTypeHandshake {
-		return "", buff, errors.New(errNotTLS)
+		return "", false, errors.New(errNotTLS)
 	}
 	recLen := int(buff[3])<<8 | int(buff[4]) // ignoring version in hdr[1:3]
 	buff, err = br.Peek(sslHeaderLen + recLen)
 	if err != nil {
-		return "", buff, err
+		return "", false, err
 	}
 	tls.Server(sniSniffConn{r: bytes.NewReader(buff)}, &tls.Config{
 		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
@@ -72,14 +72,14 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 	}).Handshake()
 	glog.Infof("[%s] Peeked SSL destination: %s", id, hostname)
 	if cfg.allowed(hostname) {
-		return hostname + port, buff, nil
+		return hostname + port, false, nil
 	}
 	glog.Warningf("[%s] Destination %s not autorized redirecting to catchall: %s", id, hostname, cfg.CatchAll.HTTPS)
-	return cfg.CatchAll.HTTPS, buff, nil
+	return cfg.CatchAll.HTTPS, true, nil
 }
 
 // HTTPDestination detect HTTP destination in headers
-func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname string, buff []byte, err error) {
+func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname string, direct bool, err error) {
 	// peek into the stream
 	index := 1
 	lastindex := index
@@ -98,14 +98,14 @@ func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname str
 			}
 		}
 		if len(buff) < index {
-			return "", buff, errors.New(errNoContent)
+			return "", false, errors.New(errNoContent)
 		}
 		char = buff[index-1]
 		if char == '\r' {
 			//begin of new line
 			line := string(buff[lastindex : index-1])
 			if strings.Compare("", line) == 0 {
-				return "", buff, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
+				return "", false, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
 			}
 			if strings.HasPrefix(line, hostHeader) {
 				hostname = strings.TrimPrefix(line, hostHeader)
@@ -120,17 +120,17 @@ func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname str
 		index++
 	}
 	if len(hostname) == 0 {
-		return "", buff, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
+		return "", false, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
 	}
 	if cfg.allowed(hostname) {
-		return hostname + port, buff, nil
+		return hostname + port, false, nil
 	}
 	glog.Warningf("[%s] Destination %s not autorized redirecting to catchall: %s", id, hostname, cfg.CatchAll.HTTP)
-	return cfg.CatchAll.HTTP, buff, nil
+	return cfg.CatchAll.HTTP, false, nil
 }
 
 //listen on defined port an forward to detected host by detectdest function
-func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (string, []byte, error)) {
+func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (string, bool, error)) {
 	glog.Infof("Listening on address %s", addr)
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -159,13 +159,13 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 		bufferReader := bufio.NewReader(c)
 		bufferWriter := bufio.NewWriter(c)
 		bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
-		dest, _, err := detectdest(id.String(), bufferIo, port)
+		dest, direct, err := detectdest(id.String(), bufferIo, port)
 		if err != nil {
 			glog.Warningf("[%s] %s", id, err)
 			c.Close()
 			continue
 		}
-		go forward(id.String(), bufferIo, dest)
+		go forward(id.String(), bufferIo, dest, direct)
 	}
 }
 
@@ -192,7 +192,7 @@ func isLoopback(addr string) bool {
 }
 
 //forward connection
-func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
+func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	// get hostname and port
 	if isLoopback(dst) {
 		glog.Warningf("[%s] not forwarding to loopback", id)
@@ -201,7 +201,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 	// forward
 	glog.Infof("[%s] Forwarding to %s", id, dst)
 	var f net.Conn
-	if len(cfg.Proxy) == 0 {
+	if len(cfg.Proxy) == 0 || direct {
 		n, err := net.Dial(proto, dst)
 		if err != nil {
 			glog.Errorf("[%s] %s", id, err)
