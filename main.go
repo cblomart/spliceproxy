@@ -107,7 +107,7 @@ func listen(port string, detectdest func(string, *bufio.ReadWriter) (string, []b
 	}
 	defer l.Close()
 	for {
-		id, _ := uuid.NewV4()
+		id := uuid.Must(uuid.NewV4())
 		c, err := l.Accept()
 		if err != nil {
 			glog.Warningf("[%s] %s", id, err)
@@ -175,7 +175,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 	// close when finished
 	defer f.Close()
 
-	glog.Info("[%s] Copying the rest of IOs", id)
+	glog.Infof("[%s] Copying the rest of IOs", id)
 
 	// coordonate read writes
 	var wg sync.WaitGroup
