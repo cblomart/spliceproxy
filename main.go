@@ -155,6 +155,9 @@ func forward(c net.Conn, buff []byte, dst string) {
 	}
 	// forward
 	glog.Infof("Forwarding: %s->%s", c.RemoteAddr().String(), dst)
+	// create a buffer for the connection
+	sendBuff := make([]byte, cfg.Buffer)
+	recvBuff := make([]byte, cfg.Buffer)
 	f, err := net.Dial("tcp", dst)
 	if err != nil {
 		glog.Error(err)
@@ -167,7 +170,7 @@ func forward(c net.Conn, buff []byte, dst string) {
 
 	// write read buffer
 	glog.Infof("Sending peeking buffer: %d bytes", len(buff))
-	if _, err = f.Write(buff); err != nil {
+	if _, err = io.CopyBuffer(f, bytes.NewReader(buff), sendBuff); err != nil {
 		glog.Error(err)
 		// close all
 		c.Close()
@@ -179,7 +182,7 @@ func forward(c net.Conn, buff []byte, dst string) {
 	ch := make(chan struct{}, 2)
 
 	go func() {
-		b, err := io.Copy(f, c)
+		b, err := io.CopyBuffer(f, c, sendBuff)
 		glog.Infof("Copied %d bytes %s->%s", b, c.RemoteAddr().String(), f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
@@ -192,7 +195,7 @@ func forward(c net.Conn, buff []byte, dst string) {
 	}()
 
 	go func() {
-		b, err := io.Copy(c, f)
+		b, err := io.CopyBuffer(c, f, recvBuff)
 		glog.Infof("Copied %d bytes %s->%s", b, f.RemoteAddr().String(), c.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
