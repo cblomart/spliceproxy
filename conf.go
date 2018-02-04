@@ -1,5 +1,9 @@
 package main
 
+import (
+	"strings"
+)
+
 type catchAllDef struct {
 	HTTP  string
 	HTTPS string
@@ -21,7 +25,7 @@ type conf struct {
 
 func (c *conf) allowed(a string) bool {
 	for _, b := range c.AllowedDomains {
-		if b == a {
+		if strings.HasSuffix(a, b) {
 			return true
 		}
 	}
