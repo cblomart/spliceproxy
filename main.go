@@ -32,7 +32,7 @@ const (
 var cfg conf
 
 // from https://github.com/google/tcpproxy/blob/de1c7de/sni.go#L156
-func HTTPSDestination(br *bufio.Reader) (hostname string, buff []byte, err error) {
+func HTTPSDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
 	// peek into the stream
 	buff, err = br.Peek(sslHeaderLen)
 	if err != nil {
@@ -59,7 +59,7 @@ func HTTPSDestination(br *bufio.Reader) (hostname string, buff []byte, err error
 }
 
 // HTTPDestination
-func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error) {
+func HTTPDestination(br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
 	glog.Info("Peeking for destination in http")
 	// peek into the stream
 	index := 1
@@ -96,7 +96,7 @@ func HTTPDestination(br *bufio.Reader) (hostname string, buff []byte, err error)
 }
 
 //listen on defined port an forward to detected host by detectdest function
-func listen(port string, detectdest func(*bufio.Reader) (string, []byte, error)) {
+func listen(port string, detectdest func(*bufio.ReadWriter) (string, []byte, error)) {
 	glog.Infof("Listening on port %s", port)
 	l, err := net.Listen("tcp", port)
 	if err != nil {
@@ -110,16 +110,20 @@ func listen(port string, detectdest func(*bufio.Reader) (string, []byte, error))
 			c.Close()
 			continue
 		}
+		defer c.Close()
 		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 		glog.Infof("Connection: %s->%s", c.RemoteAddr().String(), port)
-		dest, buff, err := detectdest(bufio.NewReader(c))
+		bufferReader := bufio.NewReader(c)
+		bufferWriter := bufio.NewWriter(c)
+		bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
+		dest, _, err := detectdest(bufferIo)
 		if err != nil {
 			glog.Warning(err)
 			c.Close()
 			continue
 		}
 		glog.Infof("Connection: %s->%s->%s", c.RemoteAddr().String(), port, dest)
-		go forward(c, buff, dest+port)
+		go forward(bufferIo, dest+port)
 	}
 }
 
@@ -146,18 +150,14 @@ func isLoopback(addr string) bool {
 }
 
 //forward connection
-func forward(c net.Conn, buff []byte, dst string) {
+func forward(bufferIo *bufio.ReadWriter, dst string) {
 	// get hostname and port
 	if isLoopback(dst) {
 		glog.Warningf("not forwarding to loopback")
-		c.Close()
 		return
 	}
 	// forward
-	glog.Infof("Forwarding: %s->%s", c.RemoteAddr().String(), dst)
-	// create a buffer for the connection
-	sendBuff := make([]byte, cfg.Buffer)
-	recvBuff := make([]byte, cfg.Buffer)
+	glog.Infof("Forwarding to %s", dst)
 	f, err := net.Dial("tcp", dst)
 	if err != nil {
 		glog.Error(err)
@@ -166,28 +166,23 @@ func forward(c net.Conn, buff []byte, dst string) {
 
 	// close when finished
 	defer f.Close()
-	defer c.Close()
 
-	// write read buffer
-	glog.Infof("Sending peeking buffer: %d bytes", len(buff))
-	if _, err = io.CopyBuffer(f, bytes.NewReader(buff), sendBuff); err != nil {
-		glog.Error(err)
-		// close all
-		c.Close()
-		f.Close()
-		return
-	}
+	//// write read buffer
+	//glog.Infof("Sending peeking buffer: %d bytes", len(buff))
+	//if _, err = io.Copy(f, bufferIo); err != nil {
+	//	glog.Error(err)
+	//	f.Close()
+	//	return
+	//}
 
 	glog.Info("Copying the rest of IOs")
 	ch := make(chan struct{}, 2)
 
 	go func() {
-		b, err := io.CopyBuffer(f, c, sendBuff)
-		glog.Infof("Copied %d bytes %s->%s", b, c.RemoteAddr().String(), f.RemoteAddr().String())
+		b, err := io.Copy(f, bufferIo)
+		glog.Infof("Copied %d bytes to %s", b, f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
-			// close all
-			c.Close()
 			f.Close()
 			return
 		}
@@ -195,12 +190,10 @@ func forward(c net.Conn, buff []byte, dst string) {
 	}()
 
 	go func() {
-		b, err := io.CopyBuffer(c, f, recvBuff)
-		glog.Infof("Copied %d bytes %s->%s", b, f.RemoteAddr().String(), c.RemoteAddr().String())
+		b, err := io.Copy(bufferIo, f)
+		glog.Infof("Copied %d bytes from %s", b, f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
-			// close all
-			c.Close()
 			f.Close()
 			return
 		}
