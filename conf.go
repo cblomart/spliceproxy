@@ -2,6 +2,8 @@ package main
 
 import (
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 type catchAllDef struct {
@@ -26,6 +28,7 @@ type conf struct {
 func (c *conf) allowed(a string) bool {
 	for _, b := range c.AllowedDomains {
 		if strings.HasSuffix(a, b) {
+			glog.Info("Checking if %s has suffix %s", a, b)
 			return true
 		}
 	}
