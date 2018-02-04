@@ -173,7 +173,6 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 	defer f.Close()
 
 	glog.Info("Copying the rest of IOs")
-	//ch := make(chan struct{}, 2)
 
 	// coordonate read writes
 	var wg sync.WaitGroup
@@ -184,12 +183,8 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 		glog.Infof("Copied %d bytes to %s", b, f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
-			//f.Close()
-			//return
 		}
-		f.Close()
 		wg.Done()
-		//ch <- struct{}{}
 	}()
 
 	wg.Add(1)
@@ -198,15 +193,13 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 		glog.Infof("Copied %d bytes from %s", b, f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
-			//f.Close()
-			//return
 		}
-		f.Close()
 		wg.Done()
-		//ch <- struct{}{}
 	}()
+	// wait for intput and output copy
 	wg.Wait()
-	//<-ch
+	// close the connection
+	f.Close()
 }
 
 func main() {
