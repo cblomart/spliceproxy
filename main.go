@@ -105,17 +105,17 @@ func listen(port string, detectdest func(*bufio.Reader) (string, []byte, error))
 	defer l.Close()
 	for {
 		c, err := l.Accept()
-		defer c.Close()
-		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 		if err != nil {
 			glog.Warning(err)
+			c.Close()
 			continue
 		}
-		defer c.Close()
+		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 		glog.Infof("Connection: %s->%s", c.RemoteAddr().String(), port)
 		dest, buff, err := detectdest(bufio.NewReader(c))
 		if err != nil {
 			glog.Warning(err)
+			c.Close()
 			continue
 		}
 		glog.Infof("Connection: %s->%s->%s", c.RemoteAddr().String(), port, dest)
@@ -160,12 +160,18 @@ func forward(c net.Conn, buff []byte, dst string) {
 		glog.Error(err)
 		return
 	}
+
+	// close when finished
 	defer f.Close()
+	defer c.Close()
 
 	// write read buffer
 	glog.Infof("Sending peeking buffer: %d", len(buff))
 	if _, err = f.Write(buff); err != nil {
 		glog.Error(err)
+		// close all
+		c.Close()
+		f.Close()
 		return
 	}
 
@@ -173,12 +179,28 @@ func forward(c net.Conn, buff []byte, dst string) {
 	ch := make(chan struct{}, 2)
 
 	go func() {
-		io.Copy(f, c)
+		b, err := io.Copy(f, c)
+		glog.Info("Copied %d bytes %s->%s", b, c.RemoteAddr().String(), f.RemoteAddr().String())
+		if err != nil {
+			glog.Warning(err)
+			// close all
+			c.Close()
+			f.Close()
+			return
+		}
 		ch <- struct{}{}
 	}()
 
 	go func() {
-		io.Copy(c, f)
+		b, err := io.Copy(c, f)
+		glog.Info("Copied %d bytes %s->%s", b, f.RemoteAddr().String(), c.RemoteAddr().String())
+		if err != nil {
+			glog.Warning(err)
+			// close all
+			c.Close()
+			f.Close()
+			return
+		}
 		ch <- struct{}{}
 	}()
 
