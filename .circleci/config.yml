@@ -8,8 +8,7 @@ jobs:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
-      - run: go build -o $CIRCLE_PROJECT_REPONAME .
-      - run: cp $CIRCLE_PROJECT_REPONAME $CIRCLE_ARTIFACTS/
+      - run: go build -o $CIRCLE_ARTIFACTS/$CIRCLE_PROJECT_REPONAME .
   deploy:
     docker:
       - image: circleci/golang:1.8
@@ -19,7 +18,7 @@ jobs:
       - run: go get -v -t -d ./...
       - run: go get github.com/mitchellh/gox
       - run: go get github.com/tcnksm/ghr
-      - run: gox -ldflags "-X main.Version=$BUILD_VERSION -X main.BuildDate=$BUILD_DATE" -output "dist/$CIRCLE_PROJECT_REPONAME_{{.OS}}_{{.Arch}}"
+      - run: gox -ldflags "-X main.Version=$BUILD_VERSION -X main.BuildDate=$BUILD_DATE"  -output "dist/$CIRCLE_PROJECT_REPONAME_{{.OS}}_{{.Arch}}"
       - run: ghr -t $GITHUB_TOKEN -u $CIRCLE_PROJECT_USERNAME -r $CIRCLE_PROJECT_REPONAME --replace `git describe --tags` dist/
 
 workflows:
