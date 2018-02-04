@@ -58,21 +58,28 @@ func HTTPSDestination(id string, br *bufio.ReadWriter) (hostname string, buff []
 			return nil, nil
 		},
 	}).Handshake()
-	glog.Infof("[%s] Peeked a host: %s", id, hostname)
+	glog.Infof("[%s] Peeked destination: %s", id, hostname)
 	return hostname, buff, nil
 }
 
 // HTTPDestination detect HTTP destination in headers
 func HTTPDestination(id string, br *bufio.ReadWriter) (hostname string, buff []byte, err error) {
-	glog.Info("Peeking for destination in http")
 	// peek into the stream
 	index := 1
 	lastindex := index
 	var char byte
 	for index <= cfg.Buffer {
 		buff, err := br.Peek(index)
+		// for http browser will open multiple connections
+		// ignore any peeking errors that are read related
 		if err != nil {
-			glog.Warningf("[%s] %s", id, err)
+			if neterr, ok := err.(*net.OpError); ok {
+				if strings.Compare(neterr.Op, "write") == 0 {
+					glog.Warningf("[%s] %s", id, err)
+				}
+			} else {
+				glog.Warningf("[%s] %s", id, err)
+			}
 		}
 		if len(buff) < index {
 			return "", buff, errors.New(errNoContent)
@@ -86,7 +93,7 @@ func HTTPDestination(id string, br *bufio.ReadWriter) (hostname string, buff []b
 			}
 			if strings.HasPrefix(line, hostHeader) {
 				hostname = strings.TrimPrefix(line, hostHeader)
-				glog.Infof("[%s] Peeked a host: %s", id, hostname)
+				glog.Infof("[%s] Peeked destination: %s", id, hostname)
 				return hostname, buff, nil
 			}
 			lastindex = index
