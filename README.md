@@ -1,5 +1,7 @@
 # SpliceProxy
 
+[![CircleCI](https://circleci.com/gh/cblomart/spliceproxy.svg?style=svg)](https://circleci.com/gh/cblomart/spliceproxy)
+
 **Transparent** proxy for http and https sites.
 Doesn't implement ssl bumping but routes **SSL** queries in function of **server name indication**.
 Standard **http** requests uses the **Host header**.
