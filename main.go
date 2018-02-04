@@ -303,15 +303,14 @@ func main() {
 
 	// serve deny messages
 	if cfg.CatchAll.Serve {
+		http.HandleFunc("/", DenyServer)
 		go func() {
-			http.HandleFunc("/", DenyServer)
 			err := http.ListenAndServeTLS(cfg.CatchAll.HTTPS, cfg.CatchAll.Cert, cfg.CatchAll.Key, nil)
 			if err != nil {
 				glog.Fatal(err)
 			}
 		}()
 		go func() {
-			http.HandleFunc("/", DenyServer)
 			err := http.ListenAndServe(cfg.CatchAll.HTTP, nil)
 			if err != nil {
 				glog.Fatal(err)
