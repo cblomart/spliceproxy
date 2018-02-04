@@ -194,7 +194,7 @@ func isLoopback(addr string) bool {
 //forward connection
 func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	// get hostname and port
-	if isLoopback(dst) || !direct {
+	if isLoopback(dst) && direct {
 		glog.Warningf("[%s] not forwarding to loopback", id)
 		return
 	}
