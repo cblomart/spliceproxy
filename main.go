@@ -58,6 +58,7 @@ func HTTPSDestination(id string, br *bufio.ReadWriter) (hostname string, buff []
 			return nil, nil
 		},
 	}).Handshake()
+	glog.Infof("[%s] Peeked a host: %s", id, hostname)
 	return hostname, buff, nil
 }
 
@@ -116,7 +117,7 @@ func listen(port string, detectdest func(string, *bufio.ReadWriter) (string, []b
 		}
 		defer c.Close()
 		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
-		glog.Infof("[%s] Connection: %s->%s", id, c.RemoteAddr().String(), port)
+		glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), port)
 		bufferReader := bufio.NewReader(c)
 		bufferWriter := bufio.NewWriter(c)
 		bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
@@ -126,7 +127,7 @@ func listen(port string, detectdest func(string, *bufio.ReadWriter) (string, []b
 			c.Close()
 			continue
 		}
-		glog.Infof("[%s] Connection: %s->%s->%s", id, c.RemoteAddr().String(), port, dest)
+		glog.Infof("[%s] Routing: %s->%s->%s", id, c.RemoteAddr().String(), port, dest)
 		go forward(id.String(), bufferIo, dest+port)
 	}
 }
