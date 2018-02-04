@@ -5,6 +5,9 @@ import (
 )
 
 type catchAllDef struct {
+	Serve bool
+	Key   string
+	Cert  string
 	HTTP  string
 	HTTPS string
 }

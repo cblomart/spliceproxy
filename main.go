@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -37,6 +38,12 @@ var (
 	cfg   conf
 	proto string
 )
+
+// DenyServer server deny messages
+func DenyServer(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("Access denied.\n"))
+}
 
 // HTTPSDestination detect HTTPS destination via SNI
 // from https://github.com/google/tcpproxy/blob/de1c7de/sni.go#L156
@@ -294,6 +301,25 @@ func main() {
 		proto = "tcp4"
 	}
 
+	// serve deny messages
+	if cfg.CatchAll.Serve {
+		go func() {
+			http.HandleFunc("/", DenyServer)
+			err := http.ListenAndServeTLS(cfg.CatchAll.HTTPS, cfg.CatchAll.Cert, cfg.CatchAll.Key, nil)
+			if err != nil {
+				glog.Fatal(err)
+			}
+		}()
+		go func() {
+			http.HandleFunc("/", DenyServer)
+			err := http.ListenAndServe(cfg.CatchAll.HTTP, nil)
+			if err != nil {
+				glog.Fatal(err)
+			}
+		}()
+	}
+
+	// listen for requests
 	for _, d := range cfg.Listen.HTTP {
 		go listen(d, HTTPDestination)
 	}
