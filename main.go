@@ -180,7 +180,7 @@ func forward(c net.Conn, buff []byte, dst string) {
 
 	go func() {
 		b, err := io.Copy(f, c)
-		glog.Info("Copied %d bytes %s->%s", b, c.RemoteAddr().String(), f.RemoteAddr().String())
+		glog.Infof("Copied %d bytes %s->%s", b, c.RemoteAddr().String(), f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
 			// close all
@@ -193,7 +193,7 @@ func forward(c net.Conn, buff []byte, dst string) {
 
 	go func() {
 		b, err := io.Copy(c, f)
-		glog.Info("Copied %d bytes %s->%s", b, f.RemoteAddr().String(), c.RemoteAddr().String())
+		glog.Infof("Copied %d bytes %s->%s", b, f.RemoteAddr().String(), c.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
 			// close all
