@@ -290,6 +290,7 @@ func main() {
 	glog.Infof("Autorised domains: %s", strings.Join(cfg.AllowedDomains, ", "))
 	proto = "tcp"
 	if cfg.ForceIpv4 {
+		glog.Info("Forcing IPv4")
 		proto = "tcp4"
 	}
 
