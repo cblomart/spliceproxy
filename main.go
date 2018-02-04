@@ -128,6 +128,7 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 	if err != nil {
 		glog.Fatal(err)
 	}
+	port = ":" + port
 	// listen on address
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
