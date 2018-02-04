@@ -34,7 +34,8 @@ const (
 )
 
 var (
-	cfg conf
+	cfg   conf
+	proto string
 )
 
 // HTTPSDestination detect HTTPS destination via SNI
@@ -130,7 +131,7 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 	}
 	port = ":" + port
 	// listen on address
-	l, err := net.Listen("tcp", addr)
+	l, err := net.Listen(proto, addr)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -194,7 +195,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 	glog.Infof("[%s] Forwarding to %s", id, dst)
 	var f net.Conn
 	if len(cfg.Proxy) == 0 {
-		n, err := net.Dial("tcp", dst)
+		n, err := net.Dial(proto, dst)
 		if err != nil {
 			glog.Errorf("[%s] %s", id, err)
 			return
@@ -287,6 +288,10 @@ func main() {
 		glog.Infof("HTTP proxy: %s", cfg.Proxy)
 	}
 	glog.Infof("Autorised domains: %s", strings.Join(cfg.AllowedDomains, ", "))
+	proto = "tcp"
+	if cfg.ForceIpv4 {
+		proto = "tcp4"
+	}
 
 	for _, d := range cfg.Listen.HTTP {
 		go listen(d, HTTPDestination)

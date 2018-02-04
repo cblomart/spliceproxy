@@ -2,10 +2,7 @@
 Description=Splice Proxy
 
 [Service]
-Type=notify
 ExecStart=/usr/local/bin/spliceproxy -c /etc/spliceproxy.yaml
-WatchdogSec=30s
-Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

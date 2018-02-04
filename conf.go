@@ -18,6 +18,7 @@ type conf struct {
 	Timeout        int
 	Buffer         int
 	Listen         endpointsDef
+	ForceIpv4      bool
 	Proxy          string
 	CatchAll       catchAllDef
 	AllowedDomains []string
