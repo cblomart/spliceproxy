@@ -149,6 +149,7 @@ func listen(port string, detectdest func(string, *bufio.ReadWriter, string) (str
 			c.Close()
 			continue
 		}
+		glog.Infof("[%s] Found destination: %s", id, dest)
 		go forward(id.String(), bufferIo, dest)
 	}
 }
@@ -276,6 +277,10 @@ func main() {
 	}
 	glog.Infof("HTTP catchall: %s", cfg.CatchAll.HTTP)
 	glog.Infof("HTTPS catchall: %s", cfg.CatchAll.HTTPS)
+	if len(cfg.Proxy) > 0 {
+		glog.Infof("HTTP proxy: %s", cfg.Proxy)
+	}
+	glog.Infof("Autorised domains: %s", strings.Join(cfg.AllowedDomains, ", "))
 
 	for _, d := range cfg.Listen.HTTP {
 		go listen(d, HTTPDestination)
