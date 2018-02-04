@@ -274,6 +274,8 @@ func main() {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		glog.Fatal(err)
 	}
+	glog.Infof("HTTP catchall: %s", cfg.CatchAll.HTTP)
+	glog.Infof("HTTPS catchall: %s", cfg.CatchAll.HTTPS)
 
 	for _, d := range cfg.Listen.HTTP {
 		go listen(":"+d, HTTPDestination)
