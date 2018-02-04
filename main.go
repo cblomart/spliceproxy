@@ -17,7 +17,7 @@ import (
 
 	"github.com/go-yaml/yaml"
 	"github.com/golang/glog"
-	"github.com/mwitkow/go-http-dialer"
+	"github.com/rackerlabs/go-connect-tunnel"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -207,9 +207,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string) {
 			glog.Errorf("[%s] %s", id, err)
 			return
 		}
-		withProxyTimeout := http_dialer.WithConnectionTimeout(time.Duration(cfg.Timeout))
-		d := http_dialer.New(proxyURL, withProxyTimeout)
-		n, err := d.Dial("tcp", dst)
+		n, err := tunnel.DialViaProxy(proxyURL, dst)
 		if err != nil {
 			glog.Errorf("[%s] %s", id, err)
 			return
