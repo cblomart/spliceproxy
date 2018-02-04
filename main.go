@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-yaml/yaml"
@@ -164,43 +165,48 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 		return
 	}
 
+	// set deadlines
+	f.SetWriteDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
+	f.SetReadDeadline(time.Now().Add(time.Duration(cfg.Timeout*6) * time.Second))
+
 	// close when finished
 	defer f.Close()
 
-	//// write read buffer
-	//glog.Infof("Sending peeking buffer: %d bytes", len(buff))
-	//if _, err = io.Copy(f, bufferIo); err != nil {
-	//	glog.Error(err)
-	//	f.Close()
-	//	return
-	//}
-
 	glog.Info("Copying the rest of IOs")
-	ch := make(chan struct{}, 2)
+	//ch := make(chan struct{}, 2)
 
+	// coordonate read writes
+	var wg sync.WaitGroup
+
+	wg.Add(1)
 	go func() {
 		b, err := io.Copy(f, bufferIo)
 		glog.Infof("Copied %d bytes to %s", b, f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
-			f.Close()
-			return
+			//f.Close()
+			//return
 		}
-		ch <- struct{}{}
+		f.Close()
+		wg.Done()
+		//ch <- struct{}{}
 	}()
 
+	wg.Add(1)
 	go func() {
 		b, err := io.Copy(bufferIo, f)
 		glog.Infof("Copied %d bytes from %s", b, f.RemoteAddr().String())
 		if err != nil {
 			glog.Warning(err)
-			f.Close()
-			return
+			//f.Close()
+			//return
 		}
-		ch <- struct{}{}
+		f.Close()
+		wg.Done()
+		//ch <- struct{}{}
 	}()
-
-	<-ch
+	wg.Wait()
+	//<-ch
 }
 
 func main() {
