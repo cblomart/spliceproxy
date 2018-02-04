@@ -122,13 +122,20 @@ func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname str
 }
 
 //listen on defined port an forward to detected host by detectdest function
-func listen(port string, detectdest func(string, *bufio.ReadWriter, string) (string, []byte, error)) {
-	glog.Infof("Listening on port %s", port)
-	l, err := net.Listen("tcp", port)
+func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (string, []byte, error)) {
+	glog.Infof("Listening on address %s", addr)
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	// listen on address
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		glog.Fatal(err)
 	}
 	defer l.Close()
+	// check port
+
 	for {
 		id := uuid.Must(uuid.NewV4())
 		c, err := l.Accept()
