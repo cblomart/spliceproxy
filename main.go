@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -183,8 +182,13 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 		b, err := io.Copy(f, bufferIo)
 		glog.Infof("Copied %d bytes to %s", b, f.RemoteAddr().String())
 		if err != nil {
-			glog.Info("io error: ", reflect.TypeOf(err))
-			glog.Warning(err)
+			if neterr, ok := err.(*net.OpError); ok {
+				if strings.Compare(neterr.Op, "write") == 0 {
+					glog.Warning(err)
+				}
+			} else {
+				glog.Warning(err)
+			}
 		}
 		wg.Done()
 	}()
@@ -194,8 +198,13 @@ func forward(bufferIo *bufio.ReadWriter, dst string) {
 		b, err := io.Copy(bufferIo, f)
 		glog.Infof("Copied %d bytes from %s", b, f.RemoteAddr().String())
 		if err != nil {
-			glog.Info("io error: ", reflect.TypeOf(err))
-			glog.Warning(err)
+			if neterr, ok := err.(*net.OpError); ok {
+				if strings.Compare(neterr.Op, "write") == 0 {
+					glog.Warning(err)
+				}
+			} else {
+				glog.Warning(err)
+			}
 		}
 		wg.Done()
 	}()
