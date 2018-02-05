@@ -1,16 +1,12 @@
 language: go
-
 go:
 - 1.9
-
 sudo: required
-
 addons:
   apt:
     packages:
     - upx-ucl
     - musl
-    
 env:
   global:
     - COMMIT=${TRAVIS_COMMIT::8}
@@ -19,19 +15,15 @@ env:
   - BUILD_JOB=darwin-amd64
   - BUILD_JOB=linux-amd64
   - BUILD_JOB=linux-arm
-
 before_cache:
   - rm -rf $GOPATH/src/github.com/$TRAVIS_REPO_SLUG/
   - rm -rf $GOPATH/pkg/**/github.com/$TRAVIS_REPO_SLUG
-
 cache:
   directories:
   - $GOPATH/src
   - $GOPATH/pkg
-
 before_deploy:
   - for file in $(ls /tmp/*.tgz); do name=$(echo $file | sed s/\.tgz//g); mv $file ${name}_${TRAVIS_TAG}.tgz; done;
-
 deploy:
   skip_cleanup: true
   provider: releases
