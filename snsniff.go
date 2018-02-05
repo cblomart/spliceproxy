@@ -11,4 +11,4 @@ type sniSniffConn struct {
 }
 
 func (c sniSniffConn) Read(p []byte) (int, error) { return c.r.Read(p) }
-func (sniSniffConn) Write(p []byte) (int, error) { return 0, io.EOF }
+func (sniSniffConn) Write(p []byte) (int, error)  { return 0, io.EOF }
