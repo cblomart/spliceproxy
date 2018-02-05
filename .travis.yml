@@ -9,15 +9,6 @@ addons:
 env:
   global:
   - COMMIT=${TRAVIS_COMMIT::8}
-  - MUSL_BUILD_FLAGS=-ldflags '-linkmode external -s -w -extldflags "-static"' -a
-  - BUILD_FLAGS=-ldflags -s -a
-  - MUSL_CC=musl-gcc
-  - MUSL_CCGLAGS="-static"
-  matrix:
-  - GOOS=windows GOARCH=amd64 SUFFIX=.exe
-  - GOOS=darwin GOARCH=amd64
-  - GOOS=linux GOARCH=amd64
-  - GOOS=linux GOARCH=arm GOARM=5
 before_cache:
 - rm -rf $GOPATH/src/github.com/$TRAVIS_REPO_SLUG/*
 - rm -rf $GOPATH/pkg/**/github.com/$TRAVIS_REPO_SLUG
@@ -25,6 +16,104 @@ cache:
   directories:
     - $GOPATH/src
     - $GOPATH/pkg
+jobs:
+  inlude:
+    - stage: "Dependencies"
+      script: 
+        - go get -v -t -d ./...
+    - stage: "Check tools"
+      script:
+        - go get honnef.co/go/tools/cmd/gosimple
+        - go get github.com/golang/lint/golint
+        - go get github.com/gordonklaus/ineffassign
+        - go get go get github.com/GoASTScanner/gas/cmd/gas/...
+    - stage: "Checks"
+      script:
+        - $GOPATH/bin/gosimple ./...
+    - stage: "Checks"
+      script:
+        - $GOPATH/bin/gofmt -s -d .
+    - stage: "Checks"
+      script:
+        - $GOPATH/bin/go vet ./...
+    - stage: "Checks"
+      script:
+        - $GOPATH/bin/golint ./...
+    - stage: "Checks"
+      script:
+        - $GOPATH/bin/ineffassign ./
+    - stage: "Checks"
+      script:      
+        - $GOPATH/bin/gas ./...
+    - stage: "Build"
+      env:
+        - GOOS=linux
+        - GOARCH=amd64
+      script:
+        - CC=musl-gcc CCGLAGS="-static" go build -ldflags '-linkmode external -s -w -extldflags "-static"' -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
+        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+    - stage: "Build"
+      env:
+        - GOOS=darwin
+        - GOARCH=amd64
+      if: branch = master AND tag IS present
+      script:
+        - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
+        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+    - stage: "Build"
+      env:
+        - GOOS=windows
+        - GOARCH=amd64
+      if: branch = master AND tag IS present
+      script:
+        - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy.exe .
+        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+    - stage: "Build"
+      env:
+        - GOOS=linux
+        - GOARCH=arm
+        - GOARM=5
+      if: branch = master AND tag IS present
+      script:
+        - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
+        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
+    - stage: "Package"
+      env: 
+        - GOOS=linux
+        - GOARCH=amd64
+      if: branch = master AND tag IS present
+      script:
+        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
+        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
+    - stage: "Package"
+      env: 
+        - GOOS=darwin
+        - GOARCH=amd64
+      if: branch = master AND tag IS present
+      script:
+        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
+        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
+    - stage: "Package"
+      env: 
+        - GOOS=windows
+        - GOARCH=amd64
+      if: branch = master AND tag IS present
+      script:
+        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
+        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
+    - stage: "Package"
+      env: 
+        - GOOS=linux
+        - GOARCH=arm
+      if: branch = master AND tag IS present
+      script:
+        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
+        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
+
 install:
 - go get -v -t -d ./...
 - GOOS=linux GOARCH=amd64 go get honnef.co/go/tools/cmd/gosimple
