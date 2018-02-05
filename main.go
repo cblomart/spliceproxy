@@ -26,7 +26,7 @@ const (
 	errNotImp     = "Not Implemented."
 	errNoHTTPHost = "No Host header found in buffered HTTP header (%d bytes)"
 	errNotTLS     = "Communication is not TLS"
-	errNoContent  = "Nothing recieved"
+	errNoContent  = "Nothing received"
 
 	hostHeader = "Host: "
 
@@ -235,7 +235,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 
 	glog.Infof("[%s] Copying the rest of IOs", id)
 
-	// coordonate read writes
+	// coordinate read writes
 	var wg sync.WaitGroup
 
 	wg.Add(1)
