@@ -1,5 +1,7 @@
 # SpliceProxy
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/cblomart/spliceproxy)](https://goreportcard.com/report/github.com/cblomart/spliceproxy)
+
 **Transparent** proxy for http and https sites.
 Doesn't implement ssl bumping but routes **SSL** queries in function of **server name indication**.
 Standard **http** requests uses the **Host header**.
