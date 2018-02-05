@@ -138,7 +138,11 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 	}
 	port = ":" + port
 	// listen on address
-	l, err := net.Listen(proto, addr)
+	a, err := net.ResolveTCPAddr(proto, addr)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	l, err := net.ListenTCP(proto, a)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -147,12 +151,13 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 
 	for {
 		id := uuid.Must(uuid.NewV4())
-		c, err := l.Accept()
+		c, err := l.AcceptTCP()
 		if err != nil {
 			glog.Warningf("[%s] %s", id, err)
 			c.Close()
 			continue
 		}
+		c.SetLinger(0)
 		go func() {
 			defer c.Close()
 			c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
