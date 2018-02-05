@@ -42,7 +42,10 @@ var (
 // DenyServer server deny messages
 func DenyServer(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Access denied.\n"))
+	_, err := w.Write([]byte("Access denied.\n"))
+	if err != nil {
+		glog.Warning(err)
+	}
 }
 
 // HTTPSDestination detect HTTPS destination via SNI
@@ -64,12 +67,15 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 	if err != nil {
 		return "", false, err
 	}
-	tls.Server(sniSniffConn{r: bytes.NewReader(buff)}, &tls.Config{
+	err = tls.Server(sniSniffConn{r: bytes.NewReader(buff)}, &tls.Config{
 		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 			hostname = hello.ServerName
 			return nil, nil
 		},
 	}).Handshake()
+	if err != nil {
+		return "", false, err
+	}
 	glog.Infof("[%s] Peeked SSL destination: %s", id, hostname)
 	if cfg.allowed(hostname) {
 		return hostname + port, false, nil
@@ -149,12 +155,15 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 		c, err := l.Accept()
 		if err != nil {
 			glog.Warningf("[%s] %s", id, err)
-			c.Close()
 			continue
 		}
 		go func() {
 			//defer c.Close()
-			c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
+			err := c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
+			if err != nil {
+				glog.Warningf("[%s] %s", id, err)
+				return
+			}
 			glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), port)
 			bufferReader := bufio.NewReader(c)
 			bufferWriter := bufio.NewWriter(c)
@@ -162,12 +171,19 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 			dest, direct, err := detectdest(id.String(), bufferIo, port)
 			if err != nil {
 				glog.Warningf("[%s] %s", id, err)
-				c.Close()
+				err := c.Close()
+				if err != nil {
+					glog.Warningf("[%s] %s", id, err)
+					return
+				}
 				return
 			}
 			go func() {
 				forward(id.String(), bufferIo, dest, direct)
-				c.Close()
+				err := c.Close()
+				if err != nil {
+					glog.Warningf("[%s] %s", id, err)
+				}
 			}()
 		}()
 	}
@@ -231,11 +247,25 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	}
 
 	// set deadlines
-	f.SetWriteDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
-	f.SetReadDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
+	err := f.SetWriteDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
+	if err != nil {
+		glog.Warningf("[%s] %s", id, err)
+		return
+	}
+	err = f.SetReadDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
+	if err != nil {
+		glog.Warningf("[%s] %s", id, err)
+		return
+	}
 
 	// close when finished
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			glog.Warningf("[%s] %s", id, err)
+			return
+		}
+	}()
 
 	glog.Infof("[%s] Copying the rest of IOs", id)
 
@@ -276,7 +306,10 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	// wait for intput and output copy
 	wg.Wait()
 	// close the connection
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		glog.Warningf("[%s] %s", id, err)
+	}
 	// notify end of transfer
 	glog.Infof("[%s] Forwarding to %s done", id, dst)
 }
@@ -285,7 +318,10 @@ func main() {
 	// declare flags
 	var cfgfile string
 	flag.StringVar(&cfgfile, "c", "config.yaml", "config file")
-	flag.Set("logtostderr", "true")
+	err := flag.Set("logtostderr", "true")
+	if err != nil {
+		glog.Fatal(err)
+	}
 	flag.Parse()
 	// read config file
 	glog.Info("Reading config file: ", cfgfile)
