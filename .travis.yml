@@ -9,6 +9,10 @@ addons:
 env:
   global:
   - COMMIT=${TRAVIS_COMMIT::8}
+  - MUSL_BUILD_FLAGS=-ldflags '-linkmode external -s -w -extldflags "-static"' -a
+  - BUILD_FLAGS=-ldflags -s -a
+  - MUSL_CC=musl-gcc
+  - MUSL_CCGLAGS="-static"
   matrix:
   - GOOS=windows GOARCH=amd64 SUFFIX=.exe
   - GOOS=darwin GOARCH=amd64
@@ -23,28 +27,28 @@ cache:
     - $GOPATH/pkg
 install:
 - go get -v -t -d ./...
-- go get honnef.co/go/tools/cmd/gosimple
-- go get github.com/golang/lint/golint
-- go get github.com/gordonklaus/ineffassign
-- go get github.com/GoASTScanner/gas
-- gosimple ./...
-- gofmt -s -d .
-- go vet ./...
-- golint ./...
-- ineffassign ./
-- gas ./...
-- go tool vet ./.
-- go build -o /tmp/$(GOOS)/$(GOARCH)/vsphere-graphite$(SUFFIX) .
-script:
-- make dist-$BUILD_JOB
+- GOOS=linux GOARCH=amd64 go get honnef.co/go/tools/cmd/gosimple
+- GOOS=linux GOARCH=amd64 go get github.com/golang/lint/golint
+- GOOS=linux GOARCH=amd64 go get github.com/gordonklaus/ineffassign
+- GOOS=linux GOARCH=amd64 go get github.com/GoASTScanner/gas
+- $GOPATH/bin/gosimple ./...
+- $GOPATH/bin/gofmt -s -d .
+- $GOPATH/bin/go vet ./...
+- $GOPATH/bin/golint ./...
+- $GOPATH/bin/ineffassign ./
+- $GOPATH/bin/gas ./...
+- go build $(BUILD_FLAGS) -o /tmp/$(GOOS)/$(GOARCH)/spliceproxy$(SUFFIX) .
 before_deploy:
-- for file in $(ls /tmp/*.tgz); do name=$(echo $file | sed s/\.tgz//g); mv $file ${name}_${TRAVIS_TAG}.tgz; done;
+- upx -qq --best /tmp/$(GOOS)/$(GOARCH)/spliceproxy$(SUFFIX)
+- cp -r systemd /tmp/
+- cp config.sample.yaml /tmp/
+- cd /tmp/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy$(SUFFIX) ./config.sample.yaml ./systemd
 deploy:
   skip_cleanup: true
   provider: releases
   api_key:
     secure: gQrD7qd+CrPyBrpOG8mVNLZtcjMAavW3y+vcavNdlb16Mf9aoEIHdiMhv4Peq5hzfkkS8DgtCY7WwFI2KFtCyQNIVM/G6qlaql2OndYRKwGbD+d3sMniPAOulLM1QJ8Kkm4vvTbxK7kqwyL2CmNFEGPk8tQifhmVRNwSCIo5T1BlBVqD9tmYQ5uOq1trXbyY+GyCQ2a4Ff6zZFja4gb8iMNf4Op33pRFnFJrV7di4+ylJpXKjicQ0H0xM74BASD7aT9jA6+Uk8fsr8h7QKeMdovKp491nhKlVvivKNtB8roB52yQFNgjHJM8TJu4/psx11YOYUZMWiBjCdbzb4/gQt153dduAfJXPP/sQWjsxLLlonHtxS/xKjAvEw2Ei+9gMvvzwlhibYna+PYWfvMXGSwyojfNoGiJiBX8bm30ARSfhLIZepDU9AVRE62CR2ZESSegWeOJoCxTClYcGjDeXoxECpEtqOwbrQRVROHlkH2pLg3eJAzb2rQRT0nnoGydg2LecUMDdxyqSvVct/7kZzWBhTEpHh2ZemPoTbe9YytPlCAKORdUe/u8p+gN92KHPx9TXSHY+k3iNvy+8n0Ot8gio7NTpwTOszVC/r3AtFoBlDEy5KpEbdtqv495F0n+ICZzEYnWVz1VgUhnViO0sExoTaWMB8Y7LmH/k+Ufp0Y=
   file_glob: true
-  file: /tmp/vsphere-graphite_*.tgz  
+  file: /tmp/spliceproxy_*.tgz  
   on:
     tags: true
