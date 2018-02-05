@@ -1,7 +1,6 @@
 language: go
 go:
 - 1.9
-sudo: required
 addons:
   apt:
     packages:
@@ -11,12 +10,10 @@ env:
   global:
   - COMMIT=${TRAVIS_COMMIT::8}
   matrix:
-  - BUILD_JOB=windows-amd64
-  - BUILD_JOB=darwin-amd64
-  - BUILD_JOB=linux-amd64
-  - BUILD_JOB=linux-arm
-services:
-- docker
+  - GOOS=windows GOARCH=amd64 SUFFIX=.exe
+  - GOOS=darwin GOARCH=amd64
+  - GOOS=linux GOARCH=amd64
+  - GOOS=linux GOARCH=arm GOARM=5
 before_cache:
 - rm -rf $GOPATH/src/github.com/$TRAVIS_REPO_SLUG/*
 - rm -rf $GOPATH/pkg/**/github.com/$TRAVIS_REPO_SLUG
@@ -26,10 +23,20 @@ cache:
     - $GOPATH/pkg
 install:
 - go get -v -t -d ./...
-- go build .
+- go get honnef.co/go/tools/cmd/gosimple
+- go get github.com/golang/lint/golint
+- go get github.com/gordonklaus/ineffassign
+- go get github.com/GoASTScanner/gas
+- gosimple ./...
+- gofmt -s -d .
+- go vet ./...
+- golint ./...
+- ineffassign ./
+- gas ./...
+- go tool vet ./.
+- go build -o /tmp/$(GOOS)/$(GOARCH)/vsphere-graphite$(SUFFIX) .
 script:
 - make dist-$BUILD_JOB
-- make docker-$BUILD_JOB
 before_deploy:
 - for file in $(ls /tmp/*.tgz); do name=$(echo $file | sed s/\.tgz//g); mv $file ${name}_${TRAVIS_TAG}.tgz; done;
 deploy:
