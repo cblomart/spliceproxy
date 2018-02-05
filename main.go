@@ -157,7 +157,7 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 			c.Close()
 			continue
 		}
-		c.SetLinger(cfg.Timeout * 60)
+		c.SetLinger(cfg.Timeout * -60)
 		go func() {
 			defer c.Close()
 			c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
