@@ -153,7 +153,7 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 			continue
 		}
 		go func() {
-			defer c.Close()
+			//defer c.Close()
 			c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 			glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), port)
 			bufferReader := bufio.NewReader(c)
