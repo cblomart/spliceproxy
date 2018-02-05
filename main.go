@@ -165,7 +165,10 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 				c.Close()
 				return
 			}
-			go forward(id.String(), bufferIo, dest, direct)
+			go func() {
+				forward(id.String(), bufferIo, dest, direct)
+				c.Close()
+			}()
 		}()
 	}
 }
