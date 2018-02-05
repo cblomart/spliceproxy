@@ -1,11 +1,6 @@
 language: go
 go:
 - 1.9
-addons:
-  apt:
-    packages:
-    - upx-ucl
-    - musl
 jobs:
   inlude:
     - stage: "Dependencies"
