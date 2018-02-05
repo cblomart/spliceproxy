@@ -153,19 +153,21 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 			c.Close()
 			continue
 		}
-		defer c.Close()
-		c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
-		glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), port)
-		bufferReader := bufio.NewReader(c)
-		bufferWriter := bufio.NewWriter(c)
-		bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
-		dest, direct, err := detectdest(id.String(), bufferIo, port)
-		if err != nil {
-			glog.Warningf("[%s] %s", id, err)
-			c.Close()
-			continue
-		}
-		go forward(id.String(), bufferIo, dest, direct)
+		go func() {
+			defer c.Close()
+			c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
+			glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), port)
+			bufferReader := bufio.NewReader(c)
+			bufferWriter := bufio.NewWriter(c)
+			bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
+			dest, direct, err := detectdest(id.String(), bufferIo, port)
+			if err != nil {
+				glog.Warningf("[%s] %s", id, err)
+				c.Close()
+				return
+			}
+			go forward(id.String(), bufferIo, dest, direct)
+		}()
 	}
 }
 
