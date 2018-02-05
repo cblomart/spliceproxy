@@ -10,7 +10,7 @@ addons:
     packages:
     - upx-ucl
     - musl
-
+    
 env:
   global:
     - COMMIT=${TRAVIS_COMMIT::8}
