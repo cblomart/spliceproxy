@@ -6,16 +6,6 @@ addons:
     packages:
     - upx-ucl
     - musl
-env:
-  global:
-  - COMMIT=${TRAVIS_COMMIT::8}
-before_cache:
-- rm -rf $GOPATH/src/github.com/$TRAVIS_REPO_SLUG/*
-- rm -rf $GOPATH/pkg/**/github.com/$TRAVIS_REPO_SLUG
-cache:
-  directories:
-    - $GOPATH/src
-    - $GOPATH/pkg
 jobs:
   inlude:
     - stage: "Dependencies"
@@ -49,6 +39,7 @@ jobs:
       env:
         - GOOS=linux
         - GOARCH=amd64
+        - COMMIT=${TRAVIS_COMMIT::8}
       script:
         - CC=musl-gcc CCGLAGS="-static" go build -ldflags '-linkmode external -s -w -extldflags "-static"' -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
         - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
@@ -57,6 +48,7 @@ jobs:
       env:
         - GOOS=darwin
         - GOARCH=amd64
+        - COMMIT=${TRAVIS_COMMIT::8}
       if: branch = master AND tag IS present
       script:
         - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
@@ -66,6 +58,7 @@ jobs:
       env:
         - GOOS=windows
         - GOARCH=amd64
+        - COMMIT=${TRAVIS_COMMIT::8}
       if: branch = master AND tag IS present
       script:
         - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy.exe .
@@ -76,6 +69,7 @@ jobs:
         - GOOS=linux
         - GOARCH=arm
         - GOARM=5
+        - COMMIT=${TRAVIS_COMMIT::8}
       if: branch = master AND tag IS present
       script:
         - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
@@ -85,6 +79,7 @@ jobs:
       env: 
         - GOOS=linux
         - GOARCH=amd64
+        - COMMIT=${TRAVIS_COMMIT::8}
       if: branch = master AND tag IS present
       script:
         - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
@@ -93,6 +88,7 @@ jobs:
       env: 
         - GOOS=darwin
         - GOARCH=amd64
+        - COMMIT=${TRAVIS_COMMIT::8}
       if: branch = master AND tag IS present
       script:
         - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
@@ -101,6 +97,7 @@ jobs:
       env: 
         - GOOS=windows
         - GOARCH=amd64
+        - COMMIT=${TRAVIS_COMMIT::8}
       if: branch = master AND tag IS present
       script:
         - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
@@ -109,6 +106,7 @@ jobs:
       env: 
         - GOOS=linux
         - GOARCH=arm
+        - COMMIT=${TRAVIS_COMMIT::8}
       if: branch = master AND tag IS present
       script:
         - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
