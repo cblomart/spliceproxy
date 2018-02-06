@@ -108,6 +108,8 @@ func streamcopy(id string, dst io.Writer, src io.Reader) {
 			if strings.Compare(neterr.Op, "read") == 0 {
 				return
 			}
+			glog.Warningf("[%s] neterr on %s (timeout: %s)", id, neterr.Op, neterr.Timeout)
+			return
 		}
 		glog.Warningf("[%s] %s", id, err)
 	}
