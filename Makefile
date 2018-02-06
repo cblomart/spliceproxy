@@ -70,7 +70,7 @@ checks:
 
 $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/$(PROGRAM)$(SUFFIX): $(SRC_FILES)
 	go build $(BUILD_FLAGS) -o $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/$(PROGRAM)$(SUFFIX) .
-	upx -qq --best $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/$(PROGRAM)/$(SUFFIX)
+	upx -qq --best $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/$(PROGRAM)$(SUFFIX)
 	cp config.sample.yaml $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/config.sample.yaml
 	cp -Rf systemd $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/
 
