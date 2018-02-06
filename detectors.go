@@ -56,7 +56,7 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 // return the next line as a string
 func peekline(br *bufio.Reader, start *int, index *int) (string, error) {
 	if *index >= cfg.Buffer {
-		return "", errors.New("Exceeded buffer limit")
+		return "", errors.New(errExceedBuffer)
 	}
 	buff, err := br.Peek(*index)
 	if err != nil {
@@ -64,9 +64,9 @@ func peekline(br *bufio.Reader, start *int, index *int) (string, error) {
 	}
 	if buff[*index-1] == '\r' || buff[*index-1] == '\n' {
 		tmp := buff[*start : *index-1]
-		skip := 2
+		skip := 1
 		if buff[*index-1] == '\n' {
-			skip = 1
+			skip = 0
 		}
 		*start = *index + skip
 		*index = *start + 1
@@ -81,6 +81,9 @@ func peekhost(br *bufio.Reader, start *int, index *int) (string, error) {
 	line, err := peekline(br, start, index)
 	for {
 		glog.Infof("http header: %s", line)
+		if len(line) == 0 {
+			return "", errors.New(errNoHTTPHost)
+		}
 		if err != nil {
 			return "", errors.New(errNoContent)
 		}

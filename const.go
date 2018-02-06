@@ -1,10 +1,11 @@
 package main
 
 const (
-	errNotImp     = "Not Implemented."
-	errNoHTTPHost = "No Host header found in buffered HTTP header (%d bytes)"
-	errNotTLS     = "Communication is not TLS"
-	errNoContent  = "Nothing received"
+	errNotImp       = "Not Implemented."
+	errNoHTTPHost   = "No Host header found in buffered HTTP header (%d bytes)"
+	errNotTLS       = "Communication is not TLS"
+	errNoContent    = "Nothing received"
+	errExceedBuffer = "Exceeded buffer limit"
 
 	hostHeader = "Host: "
 
