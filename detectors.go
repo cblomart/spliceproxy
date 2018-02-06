@@ -80,6 +80,7 @@ func peekline(br *bufio.Reader, start *int, index *int) (string, error) {
 func peekhost(br *bufio.Reader, start *int, index *int) (string, error) {
 	line, err := peekline(br, start, index)
 	for {
+		glog.Infof("http header: %s", line)
 		if err != nil {
 			return "", errors.New(errNoContent)
 		}
