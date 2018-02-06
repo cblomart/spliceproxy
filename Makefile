@@ -75,7 +75,7 @@ $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/$(PROGRAM)$(SUFFIX): $(SRC_FILES)
 	cp -Rf systemd $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/
 
 $(RELEASE_DIR)/$(PROGRAM)_$(GOOS)_$(GOARCH).tgz: $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/$(PROGRAM)$(SUFFIX)
-	cd $(RELEASE_DIR)/$(GOOS)/$(GOARCH); tar czf /tmp/$(PROGRAM)_$(GOOS)_$(GOARCH).tgz ./$(PROGRAM)$(SUFFIX) ./confg.sample.yaml ./systemd
+	cd $(RELEASE_DIR)/$(GOOS)/$(GOARCH); tar czf /tmp/$(PROGRAM)_$(GOOS)_$(GOARCH).tgz ./$(PROGRAM)$(SUFFIX) ./config.sample.yaml ./systemd
 
 dist: $(RELEASE_DIR)/$(PROGRAM)_$(GOOS)_$(GOARCH).tgz
 
