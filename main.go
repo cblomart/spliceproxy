@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"io"
 	"io/ioutil"
@@ -116,6 +117,13 @@ func streamcopy(id string, dst io.Writer, src io.Reader) {
 
 // get connection
 func getconn(id string, dst string, direct bool) (net.Conn, error) {
+	if direct {
+		glog.Infof("[%s] Direct connection forced", id)
+	}
+	// get hostname and port
+	if isLoopback(dst) && !direct {
+		return nil, errors.New(errNoLoopback)
+	}
 	if len(cfg.Proxy) == 0 || direct {
 		return net.Dial(proto, dst)
 	}
@@ -141,14 +149,6 @@ func closeconn(id string, c net.Conn) {
 
 //forward connection
 func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
-	if direct {
-		glog.Infof("[%s] Direct connection forced", id)
-	}
-	// get hostname and port
-	if isLoopback(dst) && !direct {
-		glog.Warningf("[%s] not forwarding to loopback", id)
-		return
-	}
 	// forward
 	glog.Infof("[%s] Forwarding to %s", id, dst)
 	// get a connection
@@ -157,10 +157,8 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 		glog.Errorf("[%s] %s", id, err)
 		return
 	}
-
 	// close when finished
 	defer closeconn(id, f)
-
 	// set deadlines
 	err = f.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
 	if err != nil {
