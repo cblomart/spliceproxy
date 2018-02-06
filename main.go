@@ -33,57 +33,47 @@ func DenyServer(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func handleconn(id string, c net.Conn, detectdest func(string, *bufio.ReadWriter, string) (string, bool, error)) {
+	_, port, err := net.SplitHostPort(c.LocalAddr().String())
+	if err != nil {
+		glog.Warningf("[%s] %s", id, err)
+		return
+	}
+	err = c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
+	if err != nil {
+		glog.Warningf("[%s] %s", id, err)
+	}
+	glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), ":"+port)
+	bufferIo := bufio.NewReadWriter(bufio.NewReader(c), bufio.NewWriter(c))
+	dest, direct, err := detectdest(id, bufferIo, ":"+port)
+	if err != nil {
+		glog.Warningf("[%s] %s", id, err)
+		closeconn(id, c)
+		return
+	}
+	go func() {
+		forward(id, bufferIo, dest, direct)
+		closeconn(id, c)
+	}()
+}
+
 //listen on defined port an forward to detected host by detectdest function
 func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (string, bool, error)) {
 	glog.Infof("Listening on address %s", addr)
-	_, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	port = ":" + port
 	l, err := net.Listen(proto, addr)
 	if err != nil {
 		glog.Fatal(err)
 	}
 	defer l.Close()
 	// check port
-
 	for {
-		id := uuid.Must(uuid.NewV4())
+		id := uuid.Must(uuid.NewV4()).String()
 		c, err := l.Accept()
 		if err != nil {
 			glog.Warningf("[%s] %s", id, err)
 			continue
 		}
-		go func() {
-			//defer c.Close()
-			err := c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
-			if err != nil {
-				glog.Warningf("[%s] %s", id, err)
-				return
-			}
-			glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), port)
-			bufferReader := bufio.NewReader(c)
-			bufferWriter := bufio.NewWriter(c)
-			bufferIo := bufio.NewReadWriter(bufferReader, bufferWriter)
-			dest, direct, err := detectdest(id.String(), bufferIo, port)
-			if err != nil {
-				glog.Warningf("[%s] %s", id, err)
-				err := c.Close()
-				if err != nil {
-					glog.Warningf("[%s] %s", id, err)
-					return
-				}
-				return
-			}
-			go func() {
-				forward(id.String(), bufferIo, dest, direct)
-				err := c.Close()
-				if err != nil {
-					glog.Warningf("[%s] %s", id, err)
-				}
-			}()
-		}()
+		go handleconn(id, c, detectdest)
 	}
 }
 
@@ -161,10 +151,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	err = f.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 	if err != nil {
 		glog.Warningf("[%s] %s", id, err)
-		return
 	}
-	// start stream
-	glog.Infof("[%s] Copying the rest of IOs", id)
 	// coordinate read writes
 	var wg sync.WaitGroup
 	wg.Add(1)
