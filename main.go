@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -75,8 +74,11 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 		},
 	}).Handshake()
 	if err != nil {
-		glog.Warningf("Error from tls: %s", reflect.TypeOf(err).Name())
-		return "", false, err
+		// throw other errors than no certificates configured
+		// this errors is defined as errors.New(...) in go sources
+		if strings.Compare(err.Error(), "tls: no certificates configured") != 0 {
+			return "", false, err
+		}
 	}
 	glog.Infof("[%s] Peeked SSL destination: %s", id, hostname)
 	if cfg.allowed(hostname) {
