@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -267,8 +266,11 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	defer func() {
 		err := f.Close()
 		if err != nil {
-			glog.Warningf("[%s] - %s - %s", id, reflect.TypeOf(err).Name(), err)
-			return
+			neterr, ok := err.(*net.OpError)
+			if ok && neterr.Err.Error() == "use of closed network connection" {
+				return
+			}
+			glog.Warningf("[%s] %s", id, err)
 		}
 	}()
 
