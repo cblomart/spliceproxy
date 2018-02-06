@@ -64,13 +64,12 @@ func peekline(br *bufio.Reader, start *int, index *int) (string, error) {
 	}
 	if buff[*index-1] == '\r' || buff[*index-1] == '\n' {
 		tmp := buff[*start : *index-1]
+		skip := 2
 		if buff[*index-1] == '\n' {
-			*start = *index + 1
-			*index += 2
-		} else {
-			*start = *index + 2
-			*index += 3
+			skip = 1
 		}
+		*start = *index + skip
+		*index = *start + 1
 		return string(tmp), nil
 	}
 	*index++
