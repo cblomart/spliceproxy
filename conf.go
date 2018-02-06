@@ -2,6 +2,8 @@ package main
 
 import (
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 type catchAllDef struct {
@@ -34,4 +36,15 @@ func (c *conf) allowed(a string) bool {
 		}
 	}
 	return false
+}
+
+func (c *conf) route(id, hostname string, port string, ssl bool) (string, bool) {
+	if len(hostname) > 0 && c.allowed(hostname) {
+		return hostname + port, false
+	}
+	glog.Infof("[%s] Unautorised or unknown destination '%s', redirecting to catchall", id, hostname)
+	if !ssl {
+		return cfg.CatchAll.HTTP, true
+	}
+	return cfg.CatchAll.HTTPS, true
 }

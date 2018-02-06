@@ -12,22 +12,28 @@ import (
 	"github.com/golang/glog"
 )
 
+// HTTPSValidateHello validates hello tls message
+func HTTPSValidateHello(br *bufio.Reader) ([]byte, error) {
+	buff, err := br.Peek(sslHeaderLen)
+	if err != nil {
+		return nil, err
+	}
+	// check ssl parameters
+	if len(buff) == 0 {
+		return nil, errors.New(errNoContent)
+	}
+	if buff[0] != sslTypeHandshake {
+		return nil, errors.New(errNotTLS)
+	}
+	recLen := int(buff[3])<<8 | int(buff[4]) // ignoring version in hdr[1:3]
+	return br.Peek(sslHeaderLen + recLen)
+}
+
 // HTTPSDestination detect HTTPS destination via SNI
 // from https://github.com/google/tcpproxy/blob/de1c7de/sni.go#L156
 func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname string, direct bool, err error) {
 	// peek into the stream
-	buff, err := br.Peek(sslHeaderLen)
-	if err != nil {
-		glog.Warningf("[%s] %s", id, err)
-	}
-	if len(buff) == 0 {
-		return "", false, errors.New(errNoContent)
-	}
-	if buff[0] != sslTypeHandshake {
-		return "", false, errors.New(errNotTLS)
-	}
-	recLen := int(buff[3])<<8 | int(buff[4]) // ignoring version in hdr[1:3]
-	buff, err = br.Peek(sslHeaderLen + recLen)
+	buff, err := HTTPSValidateHello(br.Reader)
 	if err != nil {
 		return "", false, err
 	}
@@ -45,11 +51,8 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 		}
 	}
 	glog.Infof("[%s] Peeked SSL destination: %s", id, hostname)
-	if cfg.allowed(hostname) {
-		return hostname + port, false, nil
-	}
-	glog.Warningf("[%s] Destination %s not autorized redirecting to catchall: %s", id, hostname, cfg.CatchAll.HTTPS)
-	return cfg.CatchAll.HTTPS, true, nil
+	dest, direct := cfg.route(id, hostname, port, true)
+	return dest, direct, nil
 }
 
 // HTTPDestination detect HTTP destination in headers
@@ -93,12 +96,6 @@ func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname str
 		}
 		index++
 	}
-	if len(hostname) == 0 {
-		return "", false, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
-	}
-	if cfg.allowed(hostname) {
-		return hostname + port, false, nil
-	}
-	glog.Warningf("[%s] Destination %s not autorized redirecting to catchall: %s", id, hostname, cfg.CatchAll.HTTP)
-	return cfg.CatchAll.HTTP, true, nil
+	dest, direct := cfg.route(id, hostname, port, true)
+	return dest, direct, nil
 }
