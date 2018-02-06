@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
-	"fmt"
-	"net"
 	"strings"
 
 	"github.com/golang/glog"
@@ -55,46 +53,54 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 	return dest, direct, nil
 }
 
-// HTTPDestination detect HTTP destination in headers
-func HTTPDestination(id string, br *bufio.ReadWriter, port string) (hostname string, direct bool, err error) {
-	// peek into the stream
-	index := 1
-	lastindex := index
-	var char byte
-	for index <= cfg.Buffer {
-		buff, err := br.Peek(index)
-		// for http browser will open multiple connections
-		// ignore any peeking errors that are read related
+// return the next line as a string
+func peekline(br *bufio.Reader, start *int, index *int) (string, error) {
+	if *index >= cfg.Buffer {
+		return "", errors.New("Exceeded buffer limit")
+	}
+	buff, err := br.Peek(*index)
+	if err != nil {
+		return "", err
+	}
+	if buff[*index-1] == '\r' {
+		tmp := buff[*start : *index-1]
+		*start = *index + 2
+		*index += 3
+		return string(tmp), nil
+	}
+	if buff[*index-1] == '\n' {
+		tmp := buff[*start : *index-1]
+		*start = *index + 1
+		*index += 2
+		return string(tmp), nil
+	}
+	*index++
+	return peekline(br, start, index)
+}
+
+// peek host for each lines read
+func peekhost(br *bufio.Reader, start *int, index *int) (string, error) {
+	line, err := peekline(br, start, index)
+	for {
 		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok {
-				if strings.Compare(neterr.Op, "write") == 0 {
-					glog.Warningf("[%s] %s", id, err)
-				}
-			} else {
-				glog.Warningf("[%s] %s", id, err)
-			}
+			return "", errors.New(errNoContent)
 		}
-		if len(buff) < index {
-			return "", false, errors.New(errNoContent)
+		if strings.HasPrefix(line, hostHeader) {
+			hostname := strings.TrimPrefix(line, hostHeader)
+			return hostname, nil
 		}
-		char = buff[index-1]
-		if char == '\r' {
-			//begin of new line
-			line := string(buff[lastindex : index-1])
-			if strings.Compare("", line) == 0 {
-				return "", false, fmt.Errorf(errNoHTTPHost, cfg.Buffer)
-			}
-			if strings.HasPrefix(line, hostHeader) {
-				hostname = strings.TrimPrefix(line, hostHeader)
-				glog.Infof("[%s] Peeked HTTP destination: %s", id, hostname)
-				break
-			}
-			lastindex = index
-		}
-		if char == '\n' {
-			lastindex = index
-		}
-		index++
+		line, err = peekline(br, start, index)
+	}
+}
+
+// HTTPDestination detect HTTP destination in headers
+func HTTPDestination(id string, br *bufio.ReadWriter, port string) (string, bool, error) {
+	// peek into the stream
+	start := 0
+	index := 1
+	hostname, err := peekhost(br.Reader, &start, &index)
+	if err != nil {
+		return "", false, err
 	}
 	dest, direct := cfg.route(id, hostname, port, true)
 	return dest, direct, nil
