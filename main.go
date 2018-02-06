@@ -215,6 +215,21 @@ func isLoopback(addr string) bool {
 	return true
 }
 
+// streamcopy copies a stream from one to the other
+func streamcopy(id string, dst io.Writer, src io.Reader) {
+	b, err := io.Copy(dst, src)
+	glog.Infof("[%s] Copied %d bytes", id, b)
+	if err != nil {
+		if neterr, ok := err.(*net.OpError); ok {
+			if strings.Compare(neterr.Op, "write") == 0 {
+				glog.Warningf("[%s] %s", id, err)
+			}
+		} else {
+			glog.Warningf("[%s] %s", id, err)
+		}
+	}
+}
+
 //forward connection
 func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	if direct {
@@ -281,33 +296,13 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 
 	wg.Add(1)
 	go func() {
-		b, err := io.Copy(f, bufferIo)
-		glog.Infof("[%s] Copied %d bytes to %s for %s", id, b, f.RemoteAddr().String(), dst)
-		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok {
-				if strings.Compare(neterr.Op, "write") == 0 {
-					glog.Warningf("[%s] %s", id, err)
-				}
-			} else {
-				glog.Warningf("[%s] %s", id, err)
-			}
-		}
+		streamcopy(id, f, bufferIo)
 		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
-		b, err := io.Copy(bufferIo, f)
-		glog.Infof("[%s] Copied %d bytes from %s for %s", id, b, f.RemoteAddr().String(), dst)
-		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok {
-				if strings.Compare(neterr.Op, "write") == 0 {
-					glog.Warningf("[%s] %s", id, err)
-				}
-			} else {
-				glog.Warningf("[%s] %s", id, err)
-			}
-		}
+		streamcopy(id, bufferIo, f)
 		wg.Done()
 	}()
 	// wait for intput and output copy
