@@ -105,11 +105,9 @@ func streamcopy(id string, dst io.Writer, src io.Reader) {
 	glog.Infof("[%s] Copied %d bytes", id, b)
 	if err != nil {
 		if neterr, ok := err.(*net.OpError); ok {
-			if strings.Compare(neterr.Op, "read") == 0 {
+			if (neterr.Op == "read" || neterr.Op == "readfrom") && neterr.Timeout() {
 				return
 			}
-			glog.Warningf("[%s] neterr on %s (timeout: %s)", id, neterr.Op, neterr.Timeout)
-			return
 		}
 		glog.Warningf("[%s] %s", id, err)
 	}
