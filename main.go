@@ -106,10 +106,36 @@ func streamcopy(id string, dst io.Writer, src io.Reader) {
 		if neterr, ok := err.(*net.OpError); ok {
 			if strings.Compare(neterr.Op, "write") == 0 {
 				glog.Warningf("[%s] %s", id, err)
+				return
 			}
-		} else {
-			glog.Warningf("[%s] %s", id, err)
 		}
+		glog.Warningf("[%s] %s", id, err)
+		return
+	}
+}
+
+// get connection
+func getconn(id string, dst string, direct bool) (net.Conn, error) {
+	if len(cfg.Proxy) == 0 || direct {
+		return net.Dial(proto, dst)
+	}
+	glog.Infof("[%s] Proxying via: %s", id, cfg.Proxy)
+	proxyURL, err := url.Parse(cfg.Proxy)
+	if err != nil {
+		return nil, err
+	}
+	return tunnel.DialViaProxy(proxyURL, dst)
+}
+
+// close connection
+func closeconn(id string, c net.Conn) {
+	err := c.Close()
+	if err != nil {
+		neterr, ok := err.(*net.OpError)
+		if ok && neterr.Err.Error() == "use of closed network connection" {
+			return
+		}
+		glog.Warningf("[%s] %s", id, err)
 	}
 }
 
@@ -125,64 +151,31 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	}
 	// forward
 	glog.Infof("[%s] Forwarding to %s", id, dst)
-	var f net.Conn
-	if len(cfg.Proxy) == 0 || direct {
-		n, err := net.Dial(proto, dst)
-		if err != nil {
-			glog.Errorf("[%s] %s", id, err)
-			return
-		}
-		f = n
-	} else {
-		glog.Infof("[%s] Proxying via: %s", id, cfg.Proxy)
-		proxyURL, err := url.Parse(cfg.Proxy)
-		if err != nil {
-			glog.Errorf("[%s] %s", id, err)
-			return
-		}
-		n, err := tunnel.DialViaProxy(proxyURL, dst)
-		if err != nil {
-			glog.Errorf("[%s] %s", id, err)
-			return
-		}
-		f = n
-	}
-
-	// set deadlines
-	err := f.SetWriteDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
+	// get a connection
+	f, err := getconn(id, dst, direct)
 	if err != nil {
-		glog.Warningf("[%s] %s", id, err)
-		return
-	}
-	err = f.SetReadDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
-	if err != nil {
-		glog.Warningf("[%s] %s", id, err)
+		glog.Errorf("[%s] %s", id, err)
 		return
 	}
 
 	// close when finished
-	defer func() {
-		err := f.Close()
-		if err != nil {
-			neterr, ok := err.(*net.OpError)
-			if ok && neterr.Err.Error() == "use of closed network connection" {
-				return
-			}
-			glog.Warningf("[%s] %s", id, err)
-		}
-	}()
+	defer closeconn(id, f)
 
+	// set deadlines
+	err = f.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
+	if err != nil {
+		glog.Warningf("[%s] %s", id, err)
+		return
+	}
+	// start stream
 	glog.Infof("[%s] Copying the rest of IOs", id)
-
 	// coordinate read writes
 	var wg sync.WaitGroup
-
 	wg.Add(1)
 	go func() {
 		streamcopy(id, f, bufferIo)
 		wg.Done()
 	}()
-
 	wg.Add(1)
 	go func() {
 		streamcopy(id, bufferIo, f)
@@ -190,11 +183,6 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	}()
 	// wait for intput and output copy
 	wg.Wait()
-	// close the connection
-	err = f.Close()
-	if err != nil {
-		glog.Warningf("[%s] %s", id, err)
-	}
 	// notify end of transfer
 	glog.Infof("[%s] Forwarding to %s done", id, dst)
 }
