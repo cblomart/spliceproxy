@@ -105,8 +105,7 @@ func streamcopy(id string, dst io.Writer, src io.Reader) {
 	glog.Infof("[%s] Copied %d bytes", id, b)
 	if err != nil {
 		if neterr, ok := err.(*net.OpError); ok {
-			if strings.Compare(neterr.Op, "write") == 0 {
-				glog.Warningf("[%s] %s", id, err)
+			if strings.Compare(neterr.Op, "read") == 0 {
 				return
 			}
 		}
@@ -160,7 +159,7 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	// close when finished
 	defer closeconn(id, f)
 	// set deadlines
-	err = f.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout*2) * time.Second))
+	err = f.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 	if err != nil {
 		glog.Warningf("[%s] %s", id, err)
 		return
