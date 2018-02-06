@@ -1,119 +1,53 @@
 language: go
 go:
 - 1.9
-jobs:
-  inlude:
-    - stage: "Dependencies"
-      script: 
-        - go get -v -t -d ./...
-    - stage: "Check tools"
-      script:
-        - go get honnef.co/go/tools/cmd/gosimple
-        - go get github.com/golang/lint/golint
-        - go get github.com/gordonklaus/ineffassign
-        - go get go get github.com/GoASTScanner/gas/cmd/gas/...
-    - stage: "Checks"
-      script:
-        - $GOPATH/bin/gosimple ./...
-    - stage: "Checks"
-      script:
-        - $GOPATH/bin/gofmt -s -d .
-    - stage: "Checks"
-      script:
-        - $GOPATH/bin/go vet ./...
-    - stage: "Checks"
-      script:
-        - $GOPATH/bin/golint ./...
-    - stage: "Checks"
-      script:
-        - $GOPATH/bin/ineffassign ./
-    - stage: "Checks"
-      script:      
-        - $GOPATH/bin/gas ./...
-    - stage: "Build"
-      env:
-        - GOOS=linux
-        - GOARCH=amd64
-        - COMMIT=${TRAVIS_COMMIT::8}
-      script:
-        - CC=musl-gcc CCGLAGS="-static" go build -ldflags '-linkmode external -s -w -extldflags "-static"' -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
-        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-    - stage: "Build"
-      env:
-        - GOOS=darwin
-        - GOARCH=amd64
-        - COMMIT=${TRAVIS_COMMIT::8}
-      if: branch = master AND tag IS present
-      script:
-        - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
-        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-    - stage: "Build"
-      env:
-        - GOOS=windows
-        - GOARCH=amd64
-        - COMMIT=${TRAVIS_COMMIT::8}
-      if: branch = master AND tag IS present
-      script:
-        - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy.exe .
-        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-    - stage: "Build"
-      env:
-        - GOOS=linux
-        - GOARCH=arm
-        - GOARM=5
-        - COMMIT=${TRAVIS_COMMIT::8}
-      if: branch = master AND tag IS present
-      script:
-        - go build -ldflags -s -a -o /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy .
-        - cp -r systemd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-        - cp config.sample.yaml /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/
-    - stage: "Package"
-      env: 
-        - GOOS=linux
-        - GOARCH=amd64
-        - COMMIT=${TRAVIS_COMMIT::8}
-      if: branch = master AND tag IS present
-      script:
-        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
-        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
-    - stage: "Package"
-      env: 
-        - GOOS=darwin
-        - GOARCH=amd64
-        - COMMIT=${TRAVIS_COMMIT::8}
-      if: branch = master AND tag IS present
-      script:
-        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
-        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
-    - stage: "Package"
-      env: 
-        - GOOS=windows
-        - GOARCH=amd64
-        - COMMIT=${TRAVIS_COMMIT::8}
-      if: branch = master AND tag IS present
-      script:
-        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
-        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
-    - stage: "Package"
-      env: 
-        - GOOS=linux
-        - GOARCH=arm
-        - COMMIT=${TRAVIS_COMMIT::8}
-      if: branch = master AND tag IS present
-      script:
-        - upx -qq --best /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/spliceproxy
-        - cd /tmp/${COMMIT}/$(GOOS)/$(GOARCH)/; tar czf /tmp/vsphere-graphite_$(GOOS)_$(GOARCH)_${COMMIT}.tgz ./spliceproxy ./config.sample.yaml ./systemd
-    - stage: "Deploy"
-      if: branch = master AND tag IS present
-      deploy:
-        skip_cleanup: true
-        provider: releases
-        api_key:
-          secure: gQrD7qd+CrPyBrpOG8mVNLZtcjMAavW3y+vcavNdlb16Mf9aoEIHdiMhv4Peq5hzfkkS8DgtCY7WwFI2KFtCyQNIVM/G6qlaql2OndYRKwGbD+d3sMniPAOulLM1QJ8Kkm4vvTbxK7kqwyL2CmNFEGPk8tQifhmVRNwSCIo5T1BlBVqD9tmYQ5uOq1trXbyY+GyCQ2a4Ff6zZFja4gb8iMNf4Op33pRFnFJrV7di4+ylJpXKjicQ0H0xM74BASD7aT9jA6+Uk8fsr8h7QKeMdovKp491nhKlVvivKNtB8roB52yQFNgjHJM8TJu4/psx11YOYUZMWiBjCdbzb4/gQt153dduAfJXPP/sQWjsxLLlonHtxS/xKjAvEw2Ei+9gMvvzwlhibYna+PYWfvMXGSwyojfNoGiJiBX8bm30ARSfhLIZepDU9AVRE62CR2ZESSegWeOJoCxTClYcGjDeXoxECpEtqOwbrQRVROHlkH2pLg3eJAzb2rQRT0nnoGydg2LecUMDdxyqSvVct/7kZzWBhTEpHh2ZemPoTbe9YytPlCAKORdUe/u8p+gN92KHPx9TXSHY+k3iNvy+8n0Ot8gio7NTpwTOszVC/r3AtFoBlDEy5KpEbdtqv495F0n+ICZzEYnWVz1VgUhnViO0sExoTaWMB8Y7LmH/k+Ufp0Y=
-        file_glob: true
-        file: /tmp/spliceproxy_*.tgz  
-        on:
-          tags: true
+sudo: required
+addons:
+  apt:
+    packages:
+    - upx-ucl
+    - musl
+env:
+  global:
+  - MAKEFLAGS="-j 4"
+  - COMMIT=${TRAVIS_COMMIT::8}
+  - DOCKER_USERNAME=cblomart
+  - secure: HdeMVcGgMn5eqQmlKfKY/BVKzsbn/vwAN/KozEG1zW4yI4TKR9slksPZf7Vc+zZllQbTkbc6LlV1OUFOPTxElOOLOAzpqvJ8wNhpMixrSfPEko+aDZEUArKgRDoJwpUgGvT4H5xcWEA530ugu15cpuu3OMoGX5BubZKzgQedS3I7XcxpmfpNMgfbYWhIzXCmETbdQ9rnihZc95rjiVx1CEen2T9JG8DeLJe1ek9cS5gBo5c4+vM6K0x6NNNpEgI3ux/zR1Akg35seoHIvRB51SkpwJgF9fwvAmVE0UbqN/HGSLjKGO/wA81QCzdSzKc+mdcmFnqoPzuPZT5iiOGvQCIrM1ORqjE5Wj6wZHeJC1dudjPoC8Xel2AVuhrlp4GwRsl7j6q+G2NPN6V2Rjqq3ts1gXNrDxRZcEoZvR72e8xkKHkNKsQDsD4DORYFV4y6fwXYyXkdPZIN5iYZnDIfBce4rguNWveAEprhdF25MUAr1m3u9O8U0mAuiBNIBH0cVsA0e0qMwvThBPdpA3xepkbD78v41Uoz7KT4hgeZPGxLN98N/8F+ilpcr2VLe0HMATaI0hX1LrlPITK5h5Gnz3sva931WbTQPfEhAiGcZKlrg6mVi9b6vjf8Rku5Z+PSmbKZo8B9SKMJduUwmH9N+0Q4+Cgiv0MQFfZh3z3Xq2Q=
+  matrix:
+  - BUILD_JOB=windows-amd64
+  - BUILD_JOB=darwin-amd64
+  - BUILD_JOB=linux-amd64
+  - BUILD_JOB=linux-arm
+services:
+- docker
+before_cache:
+- rm -rf $GOPATH/src/github.com/cblomart/spliceproxy/*
+- rm -rf $GOPATH/pkg/**/github.com/cblomart/spliceproxy
+cache:
+  directories:
+    - $GOPATH/src
+    - $GOPATH/pkg
+install:
+- make deps
+- make checks
+script:
+- make dist-$BUILD_JOB
+- make docker-$BUILD_JOB
+before_deploy:
+- for file in $(ls /tmp/*.tgz); do name=$(echo $file | sed s/\.tgz//g); mv $file ${name}_${TRAVIS_TAG}.tgz; done;
+deploy:
+  skip_cleanup: true
+  provider: releases
+  api_key:
+    secure: gQrD7qd+CrPyBrpOG8mVNLZtcjMAavW3y+vcavNdlb16Mf9aoEIHdiMhv4Peq5hzfkkS8DgtCY7WwFI2KFtCyQNIVM/G6qlaql2OndYRKwGbD+d3sMniPAOulLM1QJ8Kkm4vvTbxK7kqwyL2CmNFEGPk8tQifhmVRNwSCIo5T1BlBVqD9tmYQ5uOq1trXbyY+GyCQ2a4Ff6zZFja4gb8iMNf4Op33pRFnFJrV7di4+ylJpXKjicQ0H0xM74BASD7aT9jA6+Uk8fsr8h7QKeMdovKp491nhKlVvivKNtB8roB52yQFNgjHJM8TJu4/psx11YOYUZMWiBjCdbzb4/gQt153dduAfJXPP/sQWjsxLLlonHtxS/xKjAvEw2Ei+9gMvvzwlhibYna+PYWfvMXGSwyojfNoGiJiBX8bm30ARSfhLIZepDU9AVRE62CR2ZESSegWeOJoCxTClYcGjDeXoxECpEtqOwbrQRVROHlkH2pLg3eJAzb2rQRT0nnoGydg2LecUMDdxyqSvVct/7kZzWBhTEpHh2ZemPoTbe9YytPlCAKORdUe/u8p+gN92KHPx9TXSHY+k3iNvy+8n0Ot8gio7NTpwTOszVC/r3AtFoBlDEy5KpEbdtqv495F0n+ICZzEYnWVz1VgUhnViO0sExoTaWMB8Y7LmH/k+Ufp0Y=
+  file_glob: true
+  file: /tmp/spliceproxy_*.tgz  
+  on:
+    tags: true
+after_success:
+- if [ "$BUILD_JOB" == "linux-amd64" ]; then DNAME="spliceproxy"; elif [ "$BUILD_JOB" == "linux-arm" ]; then DNAME="rpi-spliceproxy"; fi
+- if [ "$TRAVIS_TAG" == "" -a "$TRAVIS_BRANCH" == "master" -a "$DNAME" != "" ]; then docker tag $DOCKER_USERNAME/$DNAME $DOCKER_USERNAME/$DNAME:$COMMIT; fi
+- if [ "$TRAVIS_TAG" != "" -a "$DNAME" != "" ]; then docker tag $DOCKER_USERNAME/$DNAME $DOCKER_USERNAME/$DNAME:$TRAVIS_TAG; docker tag $DOCKER_USERNAME/$DNAME $DOCKER_USERNAME/$DNAME:latest; fi
+- if [ "$DNAME" != "" ]; then docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD; fi
+- if [ "$TRAVIS_TAG" == "" -a "$TRAVIS_BRANCH" == "master" -a "$DNAME" != "" ]; then docker push $DOCKER_USERNAME/$DNAME:$COMMIT; fi
+- if [ "$TRAVIS_TAG" != "" -a "$DNAME" != "" ]; then docker push $DOCKER_USERNAME/$DNAME:$TRAVIS_TAG; docker push $DOCKER_USERNAME/$DNAME:latest; fi
