@@ -75,7 +75,7 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 		},
 	}).Handshake()
 	if err != nil {
-		glog.Warningf("Error from tls: %f", reflect.TypeOf(err))
+		glog.Warningf("Error from tls: %f", reflect.TypeOf(err).Name)
 		return "", false, err
 	}
 	glog.Infof("[%s] Peeked SSL destination: %s", id, hostname)
