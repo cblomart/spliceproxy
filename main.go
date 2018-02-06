@@ -95,17 +95,7 @@ func isLoopback(addr string) bool {
 	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
 		return true
 	}
-	// Check for loopback network.
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return false
-	}
-	for _, ip := range ips {
-		if !ip.IsLoopback() {
-			return false
-		}
-	}
-	return true
+	return false
 }
 
 // streamcopy copies a stream from one to the other
