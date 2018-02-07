@@ -103,6 +103,7 @@ func HTTPDestination(id string, br *bufio.ReadWriter, port string) (string, bool
 	if err != nil {
 		return "", false, err
 	}
+	glog.Infof("[%s] Peeked HTTP destination: %s", id, hostname)
 	dest, direct := cfg.route(id, hostname, port, true)
 	return dest, direct, nil
 }
