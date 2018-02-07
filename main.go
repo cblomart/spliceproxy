@@ -21,7 +21,7 @@ import (
 
 var (
 	cfg   conf
-	proto string = "tcp"
+	proto = "tcp"
 )
 
 // DenyServer server deny messages
