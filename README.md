@@ -93,6 +93,6 @@ With this configuration the server will:
 - listen for http requests on localhost (127.0.0.1) on port 8080
 - listen for https requests on localhost (127.0.0.1) on port 8443
 
-# License
+## License
 
 See [License](./LICENSE)

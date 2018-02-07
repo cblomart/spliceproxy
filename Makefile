@@ -40,7 +40,7 @@ dist-linux-arm:
 	@$(MAKE) dist GOOS=linux GOARCH=arm GOARM=5
 
 docker: $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/$(PROGRAM)
-	cp $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/* docker/
+	cp -Rf $(RELEASE_DIR)/$(GOOS)/$(GOARCH)/* docker/
 	mkdir -p docker/etc
 	cp config.sample.yaml docker/etc/config.yaml
 	docker build -f docker/Dockerfile -t cblomart/$(PREFIX)$(PROGRAM) docker
