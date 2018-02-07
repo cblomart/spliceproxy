@@ -170,7 +170,8 @@ func forward(id string, bufferIo *bufio.ReadWriter, dst string, direct bool) {
 	glog.Infof("[%s] Forwarding to %s done", id, dst)
 }
 
-func main() {
+// Init initialize go program
+func init() {
 	// declare flags
 	var cfgfile string
 	flag.StringVar(&cfgfile, "c", "config.yaml", "config file")
@@ -199,24 +200,13 @@ func main() {
 		glog.Info("Forcing IPv4")
 		proto = "tcp4"
 	}
+}
 
+func main() {
 	// serve deny messages
 	if cfg.CatchAll.Serve {
-		http.HandleFunc("/", DenyServer)
-		go func() {
-			err := http.ListenAndServeTLS(cfg.CatchAll.HTTPS, cfg.CatchAll.Cert, cfg.CatchAll.Key, nil)
-			if err != nil {
-				glog.Fatal(err)
-			}
-		}()
-		go func() {
-			err := http.ListenAndServe(cfg.CatchAll.HTTP, nil)
-			if err != nil {
-				glog.Fatal(err)
-			}
-		}()
+		serveWeb()
 	}
-
 	// listen for requests
 	for _, d := range cfg.Listen.HTTP {
 		go listen(d, HTTPDestination)
@@ -224,7 +214,6 @@ func main() {
 	for _, d := range cfg.Listen.HTTPS {
 		go listen(d, HTTPSDestination)
 	}
-
 	// wait
 	select {}
 }
