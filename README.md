@@ -1,6 +1,6 @@
 # SpliceProxy
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/cblomart/spliceproxy)](https://goreportcard.com/report/github.com/cblomart/spliceproxy)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cblomart/spliceproxy)](https://goreportcard.com/report/github.com/cblomart/spliceproxy) [![Maintainability](https://api.codeclimate.com/v1/badges/1b846ff830e068ea7658/maintainability)](https://codeclimate.com/github/cblomart/spliceproxy/maintainability)
 
 **Transparent** proxy for http and https sites.
 Doesn't implement ssl bumping but routes **SSL** queries in function of **server name indication**.
