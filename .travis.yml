@@ -30,11 +30,14 @@ cache:
 install:
 - make deps
 - make checks
+- pwd
 script:
 - make dist-$BUILD_JOB
 - make docker-$BUILD_JOB
+- pwd
 before_deploy:
 - for file in $(ls /tmp/*.tgz); do name=$(echo $file | sed s/\.tgz//g); mv $file ${name}_${TRAVIS_TAG}.tgz; done;
+- pwd
 deploy:
   skip_cleanup: true
   provider: releases
