@@ -20,13 +20,6 @@ env:
   - BUILD_JOB=linux-arm
 services:
 - docker
-before_cache:
-- rm -rf $GOPATH/src/github.com/cblomart/spliceproxy
-- rm -rf $GOPATH/pkg/**/github.com/cblomart/spliceproxy
-cache:
-  directories:
-    - $GOPATH/src
-    - $GOPATH/pkg
 install:
 - make deps
 - make checks
