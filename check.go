@@ -73,6 +73,7 @@ func (s *site) Available(protocol string) bool {
 	if protocol == "https" {
 		return httpslive > 0
 	}
+	return false
 }
 
 func (s *site) Changed() bool {
