@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	cfg   conf
+	cfg   *conf
 	proto = "tcp"
 )
 

@@ -13,7 +13,7 @@ listen:
         - 0.0.0.0:80
 
 alloweddomains:
-    - example.com
-    - github.com
+    - name: example.com
+    - name: github.com
 
 check: 30

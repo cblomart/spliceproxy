@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -21,27 +22,72 @@ type endpoint struct {
 	HTTPSAvailable bool
 	HTTPAvailable  bool
 	LastUsed       bool
+	Changed        bool
 	Connections    int
+	Protocol       string
 }
 
 type site struct {
 	Name      string
-	Endpoints []*endpoint
+	Endpoints []endpoint
+	Protocol  string
 }
 
 func check() {
-	for _, s := range cfg.AllowedDomains {
+	for i := range cfg.AllowedDomains {
+		s := &cfg.AllowedDomains[i]
+		s.Info()
 		s.Resolve()
-		for _, ep := range s.Endpoints {
-			go ep.Check(s.Name)
+		for j := range s.Endpoints {
+			s.Endpoints[j].Check(s.Name)
 		}
 	}
+}
+
+func (s *site) Stats() (int, int, int, int) {
+	total := 0
+	httplive := 0
+	httpslive := 0
+	connections := 0
+	for _, ep := range s.Endpoints {
+		total++
+		if ep.HTTPAvailable {
+			httplive++
+		}
+		if ep.HTTPSAvailable {
+			httpslive++
+		}
+		connections += ep.Connections
+	}
+	return httplive, httpslive, connections, total
+}
+
+func (s *site) Available() bool {
+	httplive, httpslive, _, _ := s.Stats()
+	return httplive > 0 || httpslive > 0
+}
+
+func (s *site) Changed() bool {
+	if len(s.Endpoints) == 0 {
+		return false
+	}
+	for i := range s.Endpoints {
+		if s.Endpoints[i].Changed {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *site) Info() {
+	httplive, httpslive, connections, total := s.Stats()
+	log.Infof("Stats for %s: http=%d https=%d total=%d connection=%d", s.Name, httplive, httpslive, total, connections)
 }
 
 func (s *site) Resolve() {
 	// initialize resolver if not done
 	if resolver == nil {
-		resolver = &net.Resolver{PreferGo: true}
+		resolver = &net.Resolver{}
 	}
 	// resolve ip addresses
 	ips, err := resolver.LookupIPAddr(context.Background(), s.Name)
@@ -84,9 +130,11 @@ func (s *site) Resolve() {
 			HTTPAvailable:  false,
 			HTTPSAvailable: false,
 			LastUsed:       false,
+			Changed:        false,
 			Connections:    0,
+			Protocol:       s.Protocol,
 		}
-		s.Endpoints = append(s.Endpoints, &ep)
+		s.Endpoints = append(s.Endpoints, ep)
 	}
 }
 
@@ -101,35 +149,60 @@ func (ep *endpoint) Check(site string) {
 		}
 	}
 	// create a http request
-	go func() {
-		req, err := http.NewRequest("HEAD", fmt.Sprintf("http://%s/", ep.IP.String()), nil)
-		if err != nil {
-			log.Infof("Can't create http request for %s with address %s: %s", site, ep.IP.String(), err)
-			ep.HTTPAvailable = false
-		}
-		req.Host = site
-		_, err = httpClient.Do(req)
-		if err != nil {
-			log.Infof("Http check failed for %s with address %s: %s", site, ep.IP.String(), err)
-			ep.HTTPAvailable = false
-		} else {
-			ep.HTTPAvailable = true
-		}
-	}()
-	// create a https request
-	go func() {
-		req, err := http.NewRequest("HEAD", fmt.Sprintf("https://%s/", ep.IP.String()), nil)
-		if err != nil {
-			log.Infof("Can't create https request for %s with address %s: %s", site, ep.IP.String(), err)
-			ep.HTTPSAvailable = false
-		}
-		req.Host = site
-		_, err = httpClient.Do(req)
-		if err != nil {
-			log.Infof("Https check failed for %s with address %s: %s", site, ep.IP.String(), err)
-			ep.HTTPSAvailable = false
-		} else {
-			ep.HTTPSAvailable = true
-		}
-	}()
+	if ep.Protocol == "both" {
+		go ep.CheckProto("http", site)
+		go ep.CheckProto("https", site)
+	}
+	if ep.Protocol == "http" {
+		go ep.CheckProto("http", site)
+	}
+	if ep.Protocol == "https" {
+		go ep.CheckProto("https", site)
+	}
+}
+
+func (ep *endpoint) SetAvailability(protocol string, availability bool) {
+	if protocol == "http" {
+		ep.HTTPAvailable = availability
+		return
+	}
+	if protocol == "https" {
+		ep.HTTPSAvailable = availability
+	}
+}
+
+func (ep *endpoint) GetAvailability(protocol string) bool {
+	if protocol == "http" {
+		return ep.HTTPAvailable
+	}
+	if protocol == "https" {
+		return ep.HTTPSAvailable
+	}
+	return false
+}
+
+func (ep *endpoint) CheckProto(protocol, site string) {
+	waslive := ep.GetAvailability(protocol)
+	address := ep.IP.String()
+	if strings.Count(address, ":") >= 2 {
+		address = "[" + address + "]"
+	}
+	req, err := http.NewRequest("HEAD", fmt.Sprintf("%s://%s/", protocol, address), nil)
+	if err != nil {
+		log.Errorf("Can't create %s request for %s with address %s: %s", protocol, site, ep.IP.String(), err)
+		ep.SetAvailability(protocol, false)
+	}
+	req.Host = site
+	_, err = httpClient.Do(req)
+	if err != nil {
+		log.Warningf("%s check failed for %s with address %s: %s", protocol, site, ep.IP.String(), err)
+		ep.SetAvailability(protocol, false)
+	} else {
+		ep.SetAvailability(protocol, true)
+	}
+	if waslive != ep.GetAvailability(protocol) {
+		ep.Changed = true
+	} else {
+		ep.Changed = false
+	}
 }
