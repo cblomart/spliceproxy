@@ -22,6 +22,7 @@ func init() {
 	flag.Parse()
 	// read config file
 	log.Info("Reading config file: ", cfgfile)
+	/* #nosec */
 	data, err := ioutil.ReadFile(cfgfile)
 	if err != nil {
 		log.Fatal(err)
