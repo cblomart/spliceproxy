@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-yaml/yaml"
-	log "github.com/golang/glog"
+	log "github.com/sirupsen/logrus"
 )
 
 var (

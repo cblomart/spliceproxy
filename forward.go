@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/golang/glog"
+	log "github.com/sirupsen/logrus"
 )
 
 // streamcopy copies a stream from one to the other

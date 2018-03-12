@@ -7,9 +7,9 @@ import (
 	"net/url"
 	"time"
 
-	log "github.com/golang/glog"
 	tunnel "github.com/rackerlabs/go-connect-tunnel"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 func handleconn(id string, c net.Conn, detectdest func(string, *bufio.ReadWriter, string) (string, bool, error)) {

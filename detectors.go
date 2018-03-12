@@ -7,7 +7,7 @@ import (
 	"errors"
 	"strings"
 
-	log "github.com/golang/glog"
+	log "github.com/sirupsen/logrus"
 )
 
 // HTTPSValidateHello validates hello tls message
