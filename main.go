@@ -19,10 +19,6 @@ func init() {
 	// declare flags
 	var cfgfile string
 	flag.StringVar(&cfgfile, "c", "config.yaml", "config file")
-	err := flag.Set("logtostderr", "true")
-	if err != nil {
-		log.Fatal(err)
-	}
 	flag.Parse()
 	// read config file
 	log.Info("Reading config file: ", cfgfile)
