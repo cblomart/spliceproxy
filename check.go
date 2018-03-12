@@ -21,7 +21,6 @@ type endpoint struct {
 	IP             net.IPAddr
 	HTTPSAvailable bool
 	HTTPAvailable  bool
-	LastUsed       bool
 	Changed        bool
 	Connections    int
 	Protocol       string
@@ -31,6 +30,7 @@ type site struct {
 	Name      string
 	Endpoints []endpoint
 	Protocol  string
+	Index     int
 }
 
 func check() {
@@ -62,9 +62,17 @@ func (s *site) Stats() (int, int, int, int) {
 	return httplive, httpslive, connections, total
 }
 
-func (s *site) Available() bool {
+func (s *site) Available(protocol string) bool {
 	httplive, httpslive, _, _ := s.Stats()
-	return httplive > 0 || httpslive > 0
+	if protocol == "both" {
+		return httplive > 0 || httpslive > 0
+	}
+	if protocol == "http" {
+		return httplive > 0
+	}
+	if protocol == "https" {
+		return httpslive > 0
+	}
 }
 
 func (s *site) Changed() bool {
@@ -129,12 +137,28 @@ func (s *site) Resolve() {
 			IP:             ip,
 			HTTPAvailable:  false,
 			HTTPSAvailable: false,
-			LastUsed:       false,
 			Changed:        false,
 			Connections:    0,
 			Protocol:       s.Protocol,
 		}
 		s.Endpoints = append(s.Endpoints, ep)
+	}
+}
+
+func (s *site) GetEndpoint(protocol string) *endpoint {
+	if !s.Available(protocol) {
+		return nil
+	}
+	i := s.Index
+	for {
+		ep := s.Endpoints[i]
+		i++
+		if i >= len(s.Endpoints) {
+			i = 0
+		}
+		if ep.GetAvailability(protocol) {
+			return &ep
+		}
 	}
 }
 
@@ -144,7 +168,7 @@ func (ep *endpoint) Check(site string) {
 			Timeout: time.Duration(cfg.Timeout) * time.Second,
 			Transport: &http.Transport{
 				MaxIdleConns:    100,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // #nosec
 			},
 		}
 	}
