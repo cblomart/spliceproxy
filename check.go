@@ -164,12 +164,13 @@ func (s *site) GetEndpoint(protocol string) *endpoint {
 }
 
 func (ep *endpoint) Check(site string) {
+	/* #nosec */
 	if httpClient == nil {
 		httpClient = &http.Client{
 			Timeout: time.Duration(cfg.Timeout) * time.Second,
 			Transport: &http.Transport{
 				MaxIdleConns:    100,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // #nosec
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		}
 	}
