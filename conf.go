@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/golang/glog"
+	log "github.com/sirupsen/logrus"
 )
 
 type catchAllDef struct {
@@ -26,12 +26,13 @@ type conf struct {
 	ForceIpv4      bool
 	Proxy          string
 	CatchAll       catchAllDef
-	AllowedDomains []string
+	AllowedDomains []site
+	Check          int
 }
 
 func (c *conf) allowed(a string) bool {
 	for _, b := range c.AllowedDomains {
-		if strings.HasSuffix(a, b) {
+		if strings.HasSuffix(a, b.Name) {
 			return true
 		}
 	}
@@ -42,7 +43,7 @@ func (c *conf) route(id, hostname string, port string, ssl bool) (string, bool) 
 	if len(hostname) > 0 && c.allowed(hostname) {
 		return hostname + port, false
 	}
-	glog.Infof("[%s] Unautorised or unknown destination '%s', redirecting to catchall", id, hostname)
+	log.Infof("[%s] Unautorised or unknown destination '%s', redirecting to catchall", id, hostname)
 	if !ssl {
 		return cfg.CatchAll.HTTP, true
 	}

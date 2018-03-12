@@ -7,7 +7,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 )
 
 // HTTPSValidateHello validates hello tls message
@@ -48,7 +48,7 @@ func HTTPSDestination(id string, br *bufio.ReadWriter, port string) (hostname st
 			return "", false, err
 		}
 	}
-	glog.Infof("[%s] Peeked SSL destination: %s", id, hostname)
+	log.Infof("[%s] Peeked SSL destination: %s", id, hostname)
 	dest, direct := cfg.route(id, hostname, port, true)
 	return dest, direct, nil
 }
@@ -103,7 +103,7 @@ func HTTPDestination(id string, br *bufio.ReadWriter, port string) (string, bool
 	if err != nil {
 		return "", false, err
 	}
-	glog.Infof("[%s] Peeked HTTP destination: %s", id, hostname)
+	log.Infof("[%s] Peeked HTTP destination: %s", id, hostname)
 	dest, direct := cfg.route(id, hostname, port, true)
 	return dest, direct, nil
 }

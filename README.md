@@ -56,6 +56,8 @@ listen:
 alloweddomains:
     - example.com
     - github.com
+
+check: 30
 ```
 
 In this example configuraiton:
@@ -65,6 +67,7 @@ In this example configuraiton:
 - CatchAll: indicates where to redirect the users when access is denied
 - Listen: host and port where to listen to requests. These would be registered in your internal dns. The distinction between http and https is there to indicate how to detect the targeted site. Another solution is to redirect all http/https requests of your router to the proxy.
 - AllowedDomains: the list of domain name autorised via the proxy. Subdomains will be autorised
+- Check: will check for site enpoints availability every 30s. Setting it to 0 or less will disable checks
 
 ## Host access denied page in application
 

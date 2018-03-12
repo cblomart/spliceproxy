@@ -15,3 +15,5 @@ listen:
 alloweddomains:
     - example.com
     - github.com
+
+check: 30

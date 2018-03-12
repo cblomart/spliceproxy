@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	tunnel "github.com/rackerlabs/go-connect-tunnel"
 	uuid "github.com/satori/go.uuid"
 )
@@ -15,18 +15,18 @@ import (
 func handleconn(id string, c net.Conn, detectdest func(string, *bufio.ReadWriter, string) (string, bool, error)) {
 	_, port, err := net.SplitHostPort(c.LocalAddr().String())
 	if err != nil {
-		glog.Warningf("[%s] %s", id, err)
+		log.Warningf("[%s] %s", id, err)
 		return
 	}
 	err = c.SetDeadline(time.Now().Add(time.Duration(cfg.Timeout) * time.Second))
 	if err != nil {
-		glog.Warningf("[%s] %s", id, err)
+		log.Warningf("[%s] %s", id, err)
 	}
-	glog.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), ":"+port)
+	log.Infof("[%s] Request: %s->%s", id, c.RemoteAddr().String(), ":"+port)
 	bufferIo := bufio.NewReadWriter(bufio.NewReader(c), bufio.NewWriter(c))
 	dest, direct, err := detectdest(id, bufferIo, ":"+port)
 	if err != nil {
-		glog.Warningf("[%s] %s", id, err)
+		log.Warningf("[%s] %s", id, err)
 		closeconn(id, c)
 		return
 	}
@@ -38,10 +38,10 @@ func handleconn(id string, c net.Conn, detectdest func(string, *bufio.ReadWriter
 
 //listen on defined port an forward to detected host by detectdest function
 func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (string, bool, error)) {
-	glog.Infof("Listening on address %s", addr)
+	log.Infof("Listening on address %s", addr)
 	l, err := net.Listen(proto, addr)
 	if err != nil {
-		glog.Fatal(err)
+		log.Fatal(err)
 	}
 	defer l.Close()
 	// check port
@@ -49,7 +49,7 @@ func listen(addr string, detectdest func(string, *bufio.ReadWriter, string) (str
 		id := uuid.Must(uuid.NewV4()).String()
 		c, err := l.Accept()
 		if err != nil {
-			glog.Warningf("[%s] %s", id, err)
+			log.Warningf("[%s] %s", id, err)
 			continue
 		}
 		go handleconn(id, c, detectdest)
@@ -71,7 +71,7 @@ func isLoopback(addr string) bool {
 // get connection
 func getconn(id string, dst string, direct bool) (net.Conn, error) {
 	if direct {
-		glog.Infof("[%s] Direct connection forced", id)
+		log.Infof("[%s] Direct connection forced", id)
 	}
 	// get hostname and port
 	if isLoopback(dst) && !direct {
@@ -80,7 +80,7 @@ func getconn(id string, dst string, direct bool) (net.Conn, error) {
 	if len(cfg.Proxy) == 0 || direct {
 		return net.Dial(proto, dst)
 	}
-	glog.Infof("[%s] Proxying via: %s", id, cfg.Proxy)
+	log.Infof("[%s] Proxying via: %s", id, cfg.Proxy)
 	proxyURL, err := url.Parse(cfg.Proxy)
 	if err != nil {
 		return nil, err
@@ -96,6 +96,6 @@ func closeconn(id string, c net.Conn) {
 		if ok && neterr.Err.Error() == "use of closed network connection" {
 			return
 		}
-		glog.Warningf("[%s] %s", id, err)
+		log.Warningf("[%s] %s", id, err)
 	}
 }
